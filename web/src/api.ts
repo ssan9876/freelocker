@@ -155,3 +155,18 @@ export type BlockEvent = {
   blocked: boolean;
   at: string;
 };
+export type ApprovalStatus = "pending" | "approved" | "denied";
+export type ApprovalRequest = {
+  id: string;
+  policy_id: string;
+  policy_name: string;
+  sha256: string;
+  path: string;
+  signer: string;
+  status: ApprovalStatus;
+  device_count: number;
+  event_count: number;
+  first_seen: string;
+  last_seen: string;
+  decided_at: string | null;
+};

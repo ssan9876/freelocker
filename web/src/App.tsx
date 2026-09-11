@@ -12,6 +12,7 @@ import { DeviceDetail } from "./pages/DeviceDetail";
 import { Policies } from "./pages/Policies";
 import { PolicyDetail } from "./pages/PolicyDetail";
 import { Blocks } from "./pages/Blocks";
+import { Approvals } from "./pages/Approvals";
 import { Alerts } from "./pages/Alerts";
 import { Tokens } from "./pages/Tokens";
 import { Groups } from "./pages/Groups";
@@ -74,6 +75,7 @@ export function App() {
         <Route path="/policies" element={<Policies />} />
         <Route path="/policies/:id" element={<PolicyDetail />} />
         <Route path="/blocks" element={<Blocks />} />
+        <Route path="/approvals" element={<Approvals />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/tokens" element={<Tokens />} />
         <Route path="/groups" element={<Groups />} />

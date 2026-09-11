@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { api } from "../api";
 import { useAuth } from "../auth";
 import { useTheme } from "./util";
 
@@ -6,6 +8,7 @@ const NAV = [
   { to: "/devices", label: "Devices" },
   { to: "/policies", label: "Policies" },
   { to: "/blocks", label: "Blocked programs" },
+  { to: "/approvals", label: "Approvals" },
   { to: "/alerts", label: "Alerts" },
   { to: "/tokens", label: "Install tokens" },
   { to: "/groups", label: "Groups" },
@@ -19,6 +22,17 @@ export function Layout() {
   const theme = useTheme();
   const current = theme.get();
   const next = current === "dark" ? "light" : "dark";
+  const [pending, setPending] = useState(0);
+  useEffect(() => {
+    const load = () =>
+      api
+        .get<{ pending: number }>("/api/approvals/count")
+        .then((c) => setPending(c.pending))
+        .catch(() => {});
+    load();
+    const t = setInterval(load, 15000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
     <div className="shell">
@@ -33,6 +47,11 @@ export function Layout() {
             className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}
           >
             {n.label}
+            {n.to === "/approvals" && pending > 0 && (
+              <span className="badge fail" style={{ marginLeft: 6 }}>
+                {pending}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>
