@@ -91,4 +91,34 @@ func TestGetPolicyObserveAndReportBlocks(t *testing.T) {
 	if len(blocks) != 1 || blocks[0].Path != `C:\bad.exe` {
 		t.Fatalf("block events = %+v", blocks)
 	}
+
+	reqs, err := ts.Deps.Store.ListApprovalRequests(ctx, tenant, "pending", 10)
+	if err != nil || len(reqs) != 1 || reqs[0].SHA256 != "BB" || reqs[0].PolicyID != pid || reqs[0].DeviceCount != 1 {
+		t.Fatalf("approval requests = %+v, %v", reqs, err)
+	}
+}
+
+func TestReportBlocksWithoutPolicyCreatesNoApproval(t *testing.T) {
+	ctx := context.Background()
+	ts := startServer(t)
+	tenant := ts.Deps.Keys.TenantID
+
+	full, hash, _ := tokens.Generate(ts.Deps.Keys.CA.Pin())
+	ts.Deps.Store.CreateInstallToken(ctx, tenant, store.InstallToken{Name: "nogroup"}, hash)
+	id, err := sim.Enroll(ctx, ts.Addr, full, hw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := agentClient(t, ts, id)
+	if _, err := client.ReportBlocks(ctx, &flv1.ReportBlocksRequest{Events: []*flv1.BlockEvent{
+		{Sha256: "CC", Path: `C:\x.exe`, AtUnix: time.Now().Unix()},
+	}}); err != nil {
+		t.Fatalf("report must still ack without a policy: %v", err)
+	}
+	if blocks, _ := ts.Deps.Store.ListBlockEvents(ctx, tenant, 10); len(blocks) != 1 {
+		t.Fatalf("block events = %+v", blocks)
+	}
+	if reqs, _ := ts.Deps.Store.ListApprovalRequests(ctx, tenant, "", 10); len(reqs) != 0 {
+		t.Fatalf("approval requests = %+v, want none", reqs)
+	}
 }

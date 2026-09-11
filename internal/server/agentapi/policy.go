@@ -2,11 +2,13 @@ package agentapi
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	flv1 "freelocker/gen/freelocker/v1"
 	"freelocker/internal/server/store"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -58,7 +60,25 @@ func (s *agentService) ReportBlocks(ctx context.Context, req *flv1.ReportBlocksR
 		s.d.Log.Error("record block events", "device", dev.ID, "err", err)
 		return nil, status.Error(codes.Internal, "could not record block events")
 	}
+	s.queueApprovals(ctx, dev.TenantID, dev.ID, events)
 	return &flv1.Ack{}, nil
+}
+
+// queueApprovals turns block events into approval requests against the
+// device's effective policy. Failures are logged only: the block events are
+// already recorded and are the source of truth.
+func (s *agentService) queueApprovals(ctx context.Context, tenantID, deviceID uuid.UUID, events []store.BlockEvent) {
+	pv, err := s.d.Store.EffectivePolicyForDevice(ctx, tenantID, deviceID)
+	if errors.Is(err, store.ErrNotFound) {
+		return
+	}
+	if err != nil {
+		s.d.Log.Error("resolve policy for approvals", "device", deviceID, "err", err)
+		return
+	}
+	if err := s.d.Store.UpsertApprovalRequests(ctx, tenantID, pv.PolicyID, deviceID, events); err != nil {
+		s.d.Log.Error("queue approval requests", "device", deviceID, "err", err)
+	}
 }
 
 func (s *agentService) GetControls(ctx context.Context, _ *flv1.GetControlsRequest) (*flv1.ControlsResponse, error) {
