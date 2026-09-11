@@ -9,6 +9,7 @@ import (
 
 	"freelocker/internal/server/agentapi"
 	"freelocker/internal/server/bootstrap"
+	"freelocker/internal/server/commands"
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/store/storetest"
@@ -53,7 +54,7 @@ func startServer(t *testing.T) *testServer {
 	return &testServer{Addr: lis.Addr().String(), Deps: d, Token: full}
 }
 
-// newDeps is extended in Task 10 with the command service.
 func newDeps(s *store.Store, k *bootstrap.Keys) agentapi.Deps {
-	return agentapi.Deps{Store: s, Keys: k, Hub: hub.New()}
+	h := hub.New()
+	return agentapi.Deps{Store: s, Keys: k, Hub: h, Commands: &commands.Service{Store: s, Keys: k, Hub: h}}
 }
