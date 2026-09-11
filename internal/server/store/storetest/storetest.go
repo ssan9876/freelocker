@@ -17,6 +17,13 @@ import (
 const defaultURL = "postgres://freelocker:freelocker@localhost:55432/freelocker?sslmode=disable"
 
 func New(t *testing.T) *store.Store {
+	s, _ := NewWithSQL(t)
+	return s
+}
+
+// NewWithSQL also returns a function that executes raw SQL inside the
+// test's schema, for asserting database-level guarantees.
+func NewWithSQL(t *testing.T) (*store.Store, func(sql string, args ...any) error) {
 	t.Helper()
 	ctx := context.Background()
 	url := os.Getenv("FREELOCKER_TEST_DATABASE_URL")
@@ -31,6 +38,9 @@ func New(t *testing.T) *store.Store {
 	rand.Read(b)
 	schema := "t_" + hex.EncodeToString(b)
 	if _, err := conn.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, "SET search_path TO "+schema); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
@@ -50,5 +60,9 @@ func New(t *testing.T) *store.Store {
 	if err := s.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
-	return s
+	exec := func(sql string, args ...any) error {
+		_, err := conn.Exec(ctx, sql, args...)
+		return err
+	}
+	return s, exec
 }
