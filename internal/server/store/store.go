@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -17,6 +18,17 @@ import (
 var migrations embed.FS
 
 var ErrNotFound = errors.New("not found")
+
+var ErrConflict = errors.New("already exists")
+
+// conflict maps a unique-constraint violation to ErrConflict.
+func conflict(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return ErrConflict
+	}
+	return err
+}
 
 type Store struct {
 	pool *pgxpool.Pool
