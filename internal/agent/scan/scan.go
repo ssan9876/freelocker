@@ -1,6 +1,8 @@
 // Package scan observes the executables a device runs, for learning mode.
-// It computes each binary's SHA-256; process enumeration and signer
-// resolution are platform-specific (real on Windows, empty elsewhere).
+// It computes each binary's Authenticode SHA-256 (AuthenticodeHash) — the
+// hash WDAC rules match — so observations can be promoted straight into
+// hash rules. Process enumeration and signer resolution are
+// platform-specific (real on Windows, empty elsewhere).
 package scan
 
 import (

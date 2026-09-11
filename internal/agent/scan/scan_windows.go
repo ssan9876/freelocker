@@ -30,7 +30,7 @@ func runningImpl() ([]Observed, error) {
 		if path := imagePath(entry.ProcessID); path != "" {
 			if _, dup := seen[path]; !dup {
 				seen[path] = struct{}{}
-				if sum, err := HashFile(path); err == nil {
+				if sum, err := AuthenticodeHash(path); err == nil {
 					out = append(out, Observed{SHA256: sum, Path: path})
 				}
 			}
