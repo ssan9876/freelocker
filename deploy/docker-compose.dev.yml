@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: freelocker
+      POSTGRES_PASSWORD: freelocker
+      POSTGRES_DB: freelocker
+    ports:
+      - "55432:5432"
