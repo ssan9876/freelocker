@@ -59,12 +59,5 @@ func (s *Store) ListInstallTokens(ctx context.Context, tenantID uuid.UUID) ([]In
 }
 
 func (s *Store) RevokeInstallToken(ctx context.Context, tenantID, id uuid.UUID) error {
-	tag, err := s.pool.Exec(ctx, `UPDATE install_tokens SET revoked = true WHERE tenant_id = $1 AND id = $2`, tenantID, id)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return oneRow(s.pool.Exec(ctx, `UPDATE install_tokens SET revoked = true WHERE tenant_id = $1 AND id = $2`, tenantID, id))
 }
