@@ -22,6 +22,7 @@ import (
 	"freelocker/internal/server/httpapi"
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/keys"
+	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/tokens"
 	"freelocker/internal/server/webui"
@@ -218,6 +219,7 @@ func (a *App) setup(ctx context.Context, org, email, password string) error {
 
 func (a *App) activate(k *bootstrap.Keys) error {
 	cmds := &commands.Service{Store: a.store, Keys: k, Hub: a.hub, Log: a.log}
+	policy := &policysvc.Service{Store: a.store, Keys: k}
 	tlsCfg, err := agentapi.TLSConfig(k, a.cfg.PublicHostnames, time.Now())
 	if err != nil {
 		return err
@@ -226,7 +228,7 @@ func (a *App) activate(k *bootstrap.Keys) error {
 	if err != nil {
 		return fmt.Errorf("agent listener: %w", err)
 	}
-	srv := agentapi.NewGRPCServer(agentapi.Deps{Store: a.store, Keys: k, Hub: a.hub, Commands: cmds, Log: a.log}, tlsCfg)
+	srv := agentapi.NewGRPCServer(agentapi.Deps{Store: a.store, Keys: k, Hub: a.hub, Commands: cmds, Policy: policy, Log: a.log}, tlsCfg)
 	go func() {
 		if err := srv.Serve(lis); err != nil {
 			a.log.Error("agent API stopped", "err", err)

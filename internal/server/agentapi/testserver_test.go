@@ -11,6 +11,7 @@ import (
 	"freelocker/internal/server/bootstrap"
 	"freelocker/internal/server/commands"
 	"freelocker/internal/server/hub"
+	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/store/storetest"
 	"freelocker/internal/server/tokens"
@@ -56,5 +57,9 @@ func startServer(t *testing.T) *testServer {
 
 func newDeps(s *store.Store, k *bootstrap.Keys) agentapi.Deps {
 	h := hub.New()
-	return agentapi.Deps{Store: s, Keys: k, Hub: h, Commands: &commands.Service{Store: s, Keys: k, Hub: h}}
+	return agentapi.Deps{
+		Store: s, Keys: k, Hub: h,
+		Commands: &commands.Service{Store: s, Keys: k, Hub: h},
+		Policy:   &policysvc.Service{Store: s, Keys: k},
+	}
 }

@@ -28,6 +28,7 @@ type Identity struct {
 	KeyDER        []byte
 	CADER         []byte
 	CommandPub    ed25519.PublicKey
+	UpdatePub     ed25519.PublicKey
 	UninstallHash []byte
 }
 
@@ -90,7 +91,8 @@ func Enroll(ctx context.Context, addr, installToken string, hw *flv1.HardwareInf
 	}
 	return &Identity{
 		DeviceID: resp.GetDeviceId(), CertDER: resp.GetCertDer(), KeyDER: keyDER, CADER: resp.GetCaCertDer(),
-		CommandPub: resp.GetCommandSigningPublicKey(), UninstallHash: resp.GetUninstallCodeSha256(),
+		CommandPub: resp.GetCommandSigningPublicKey(), UpdatePub: resp.GetUpdateSigningPublicKey(),
+		UninstallHash: resp.GetUninstallCodeSha256(),
 	}, nil
 }
 

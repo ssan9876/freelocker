@@ -92,6 +92,11 @@ func (s *agentService) handle(ctx context.Context, dev device, m *flv1.AgentMess
 		if err != nil {
 			s.d.Log.Error("record heartbeat", "device", dev.ID, "err", err)
 		}
+		if pv := inv.GetPolicyVersion(); pv != "" {
+			if err := s.d.Store.SetDevicePolicyVersion(ctx, dev.TenantID, dev.ID, pv); err != nil {
+				s.d.Log.Error("record policy version", "device", dev.ID, "err", err)
+			}
+		}
 	case *flv1.AgentMessage_CommandResult:
 		if s.d.Commands == nil {
 			return

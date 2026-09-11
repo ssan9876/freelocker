@@ -10,6 +10,7 @@ import (
 	flv1 "freelocker/gen/freelocker/v1"
 	"freelocker/internal/server/bootstrap"
 	"freelocker/internal/server/hub"
+	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/store"
 
 	"google.golang.org/grpc"
@@ -21,7 +22,8 @@ type Deps struct {
 	Store    *store.Store
 	Keys     *bootstrap.Keys
 	Hub      *hub.Hub
-	Commands CommandSink // optional
+	Commands CommandSink        // optional
+	Policy   *policysvc.Service // optional; enables GetPolicy
 	Now      func() time.Time
 	Log      *slog.Logger
 }

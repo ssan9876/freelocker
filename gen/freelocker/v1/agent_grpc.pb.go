@@ -127,6 +127,9 @@ var Enrollment_ServiceDesc = grpc.ServiceDesc{
 const (
 	Agent_Connect_FullMethodName          = "/freelocker.v1.Agent/Connect"
 	Agent_RenewCertificate_FullMethodName = "/freelocker.v1.Agent/RenewCertificate"
+	Agent_GetPolicy_FullMethodName        = "/freelocker.v1.Agent/GetPolicy"
+	Agent_Observe_FullMethodName          = "/freelocker.v1.Agent/Observe"
+	Agent_ReportBlocks_FullMethodName     = "/freelocker.v1.Agent/ReportBlocks"
 )
 
 // AgentClient is the client API for Agent service.
@@ -137,6 +140,9 @@ const (
 type AgentClient interface {
 	Connect(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AgentMessage, ServerMessage], error)
 	RenewCertificate(ctx context.Context, in *RenewRequest, opts ...grpc.CallOption) (*RenewResponse, error)
+	GetPolicy(ctx context.Context, in *GetPolicyRequest, opts ...grpc.CallOption) (*GetPolicyResponse, error)
+	Observe(ctx context.Context, in *ObserveRequest, opts ...grpc.CallOption) (*Ack, error)
+	ReportBlocks(ctx context.Context, in *ReportBlocksRequest, opts ...grpc.CallOption) (*Ack, error)
 }
 
 type agentClient struct {
@@ -170,6 +176,36 @@ func (c *agentClient) RenewCertificate(ctx context.Context, in *RenewRequest, op
 	return out, nil
 }
 
+func (c *agentClient) GetPolicy(ctx context.Context, in *GetPolicyRequest, opts ...grpc.CallOption) (*GetPolicyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetPolicyResponse)
+	err := c.cc.Invoke(ctx, Agent_GetPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) Observe(ctx context.Context, in *ObserveRequest, opts ...grpc.CallOption) (*Ack, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Ack)
+	err := c.cc.Invoke(ctx, Agent_Observe_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) ReportBlocks(ctx context.Context, in *ReportBlocksRequest, opts ...grpc.CallOption) (*Ack, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Ack)
+	err := c.cc.Invoke(ctx, Agent_ReportBlocks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentServer is the server API for Agent service.
 // All implementations must embed UnimplementedAgentServer
 // for forward compatibility.
@@ -178,6 +214,9 @@ func (c *agentClient) RenewCertificate(ctx context.Context, in *RenewRequest, op
 type AgentServer interface {
 	Connect(grpc.BidiStreamingServer[AgentMessage, ServerMessage]) error
 	RenewCertificate(context.Context, *RenewRequest) (*RenewResponse, error)
+	GetPolicy(context.Context, *GetPolicyRequest) (*GetPolicyResponse, error)
+	Observe(context.Context, *ObserveRequest) (*Ack, error)
+	ReportBlocks(context.Context, *ReportBlocksRequest) (*Ack, error)
 	mustEmbedUnimplementedAgentServer()
 }
 
@@ -193,6 +232,15 @@ func (UnimplementedAgentServer) Connect(grpc.BidiStreamingServer[AgentMessage, S
 }
 func (UnimplementedAgentServer) RenewCertificate(context.Context, *RenewRequest) (*RenewResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RenewCertificate not implemented")
+}
+func (UnimplementedAgentServer) GetPolicy(context.Context, *GetPolicyRequest) (*GetPolicyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetPolicy not implemented")
+}
+func (UnimplementedAgentServer) Observe(context.Context, *ObserveRequest) (*Ack, error) {
+	return nil, status.Error(codes.Unimplemented, "method Observe not implemented")
+}
+func (UnimplementedAgentServer) ReportBlocks(context.Context, *ReportBlocksRequest) (*Ack, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReportBlocks not implemented")
 }
 func (UnimplementedAgentServer) mustEmbedUnimplementedAgentServer() {}
 func (UnimplementedAgentServer) testEmbeddedByValue()               {}
@@ -240,6 +288,60 @@ func _Agent_RenewCertificate_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Agent_GetPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).GetPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_GetPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).GetPolicy(ctx, req.(*GetPolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_Observe_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ObserveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).Observe(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_Observe_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).Observe(ctx, req.(*ObserveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_ReportBlocks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReportBlocksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).ReportBlocks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_ReportBlocks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).ReportBlocks(ctx, req.(*ReportBlocksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Agent_ServiceDesc is the grpc.ServiceDesc for Agent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -250,6 +352,18 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RenewCertificate",
 			Handler:    _Agent_RenewCertificate_Handler,
+		},
+		{
+			MethodName: "GetPolicy",
+			Handler:    _Agent_GetPolicy_Handler,
+		},
+		{
+			MethodName: "Observe",
+			Handler:    _Agent_Observe_Handler,
+		},
+		{
+			MethodName: "ReportBlocks",
+			Handler:    _Agent_ReportBlocks_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -13,6 +13,43 @@ service Enrollment {
 service Agent {
   rpc Connect(stream AgentMessage) returns (stream ServerMessage);
   rpc RenewCertificate(RenewRequest) returns (RenewResponse);
+  rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse);
+  rpc Observe(ObserveRequest) returns (Ack);
+  rpc ReportBlocks(ReportBlocksRequest) returns (Ack);
+}
+
+message Ack {}
+
+message GetPolicyRequest {}
+
+message GetPolicyResponse {
+  string version = 1;
+  string mode = 2; // "audit" or "enforce"
+  bytes xml = 3;
+  bytes signature = 4; // Ed25519 over the version string, update-signing key
+}
+
+// ObservedApp is a running/seen executable reported during learning mode.
+message ObservedApp {
+  string sha256 = 1;
+  string path = 2;
+  string signer = 3;
+}
+
+message ObserveRequest {
+  repeated ObservedApp apps = 1;
+}
+
+message BlockEvent {
+  string sha256 = 1;
+  string path = 2;
+  string signer = 3;
+  bool blocked = 4; // true = enforced block, false = audit-only would-block
+  int64 at_unix = 5;
+}
+
+message ReportBlocksRequest {
+  repeated BlockEvent events = 1;
 }
 
 message HardwareInfo {
@@ -43,6 +80,7 @@ message Inventory {
   string logged_on_user = 4;
   string agent_version = 5;
   int64 uptime_seconds = 6;
+  string policy_version = 7; // the WDAC policy version the agent has applied
 }
 
 message Heartbeat {
