@@ -19,6 +19,10 @@ func (a *API) routes(r chi.Router) {
 	r.Get("/api/tokens", a.listTokens)
 	r.Get("/api/releases", a.listReleases)
 	r.Get("/api/audit", a.listAudit)
+	r.Get("/api/policies", a.listPolicies)
+	r.Get("/api/policies/{id}", a.getPolicy)
+	r.Get("/api/devices/{id}/observations", a.listObservations)
+	r.Get("/api/blocks", a.listBlocks)
 
 	r.Group(func(r chi.Router) {
 		r.Use(a.requireRole("admin"))
@@ -27,6 +31,14 @@ func (a *API) routes(r chi.Router) {
 		r.Post("/api/groups", a.createGroup)
 		r.Post("/api/tokens", a.createToken)
 		r.Post("/api/tokens/{id}/revoke", a.revokeToken)
+		r.Post("/api/policies", a.createPolicy)
+		r.Post("/api/policies/{id}/mode", a.setPolicyMode)
+		r.Delete("/api/policies/{id}", a.deletePolicy)
+		r.Post("/api/policies/{id}/rules", a.addRule)
+		r.Delete("/api/policies/{id}/rules/{ruleId}", a.deleteRule)
+		r.Post("/api/policies/{id}/assign", a.assignPolicy)
+		r.Post("/api/policies/{id}/recompile", a.recompilePolicy)
+		r.Post("/api/observations/promote", a.promoteObservation)
 	})
 
 	r.Group(func(r chi.Router) {

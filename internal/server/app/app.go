@@ -235,7 +235,7 @@ func (a *App) activate(k *bootstrap.Keys) error {
 		}
 	}()
 	a.mu.Lock()
-	a.rt = &httpapi.Runtime{Keys: k, Commands: cmds}
+	a.rt = &httpapi.Runtime{Keys: k, Commands: cmds, Policy: policy}
 	a.agentSrv, a.agentAddr = srv, lis.Addr()
 	a.mu.Unlock()
 	a.log.Info("agent API listening", "addr", lis.Addr().String(), "ca_pin", k.CA.Pin())

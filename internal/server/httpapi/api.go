@@ -12,6 +12,7 @@ import (
 	"freelocker/internal/server/commands"
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/keys"
+	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/store"
 
 	"github.com/go-chi/chi/v5"
@@ -20,6 +21,7 @@ import (
 type Runtime struct {
 	Keys     *bootstrap.Keys
 	Commands *commands.Service
+	Policy   *policysvc.Service
 }
 
 type API struct {

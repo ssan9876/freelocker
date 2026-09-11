@@ -17,6 +17,7 @@ import (
 	"freelocker/internal/server/httpapi"
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/keys"
+	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/store/storetest"
 
@@ -63,7 +64,11 @@ func newEnv(t *testing.T) *env {
 				return err
 			}
 			mu.Lock()
-			rt = &httpapi.Runtime{Keys: k, Commands: &commands.Service{Store: s, Keys: k, Hub: h}}
+			rt = &httpapi.Runtime{
+				Keys:     k,
+				Commands: &commands.Service{Store: s, Keys: k, Hub: h},
+				Policy:   &policysvc.Service{Store: s, Keys: k},
+			}
 			mu.Unlock()
 			return nil
 		},
