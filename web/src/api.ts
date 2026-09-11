@@ -128,6 +128,24 @@ export type Observation = {
   first_seen: string;
   last_seen: string;
 };
+export type MetricSample = { at: string; cpu_pct: number; mem_pct: number; disk_pct: number };
+export type AlertRule = {
+  id: string;
+  name: string;
+  metric: "cpu" | "mem" | "disk";
+  op: "gt" | "lt";
+  threshold: number;
+  duration_seconds: number;
+  enabled: boolean;
+};
+export type Alert = {
+  id: number;
+  device_id: string;
+  metric: string;
+  message: string;
+  at: string;
+  resolved_at: string | null;
+};
 export type BlockEvent = {
   id: number;
   device_id: string;

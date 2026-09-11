@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, ApiError, Command, DeviceDetail as Detail, Observation, Policy } from "../api";
+import { api, ApiError, Command, DeviceDetail as Detail, MetricSample, Observation, Policy } from "../api";
 import { StatusDot } from "../components/StatusDot";
 import { Confirm } from "../components/Confirm";
+import { Sparkline } from "../components/Sparkline";
 import { useToast } from "../components/Toast";
 import { fmtDate, fmtUptime, timeAgo } from "../components/util";
+
+// metricSeries returns oldest→newest values for a sparkline (the API
+// returns newest first).
+function metricSeries(samples: MetricSample[], key: "cpu_pct" | "mem_pct" | "disk_pct"): number[] {
+  return samples.map((s) => s[key]).reverse();
+}
 
 const COMMANDS: { type: string; label: string }[] = [
   { type: "ping", label: "Ping" },
@@ -20,6 +27,7 @@ export function DeviceDetail() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [cmds, setCmds] = useState<Command[]>([]);
   const [obs, setObs] = useState<Observation[]>([]);
+  const [samples, setSamples] = useState<MetricSample[]>([]);
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [promoteTo, setPromoteTo] = useState("");
   const [confirmRevoke, setConfirmRevoke] = useState(false);
@@ -29,6 +37,7 @@ export function DeviceDetail() {
     api.get<Detail>(`/api/devices/${id}`).then(setDetail).catch(() => setDetail(null));
     api.get<Command[]>(`/api/devices/${id}/commands?limit=25`).then(setCmds).catch(() => {});
     api.get<Observation[]>(`/api/devices/${id}/observations?limit=100`).then(setObs).catch(() => {});
+    api.get<MetricSample[]>(`/api/devices/${id}/metrics?limit=120`).then(setSamples).catch(() => {});
   };
 
   useEffect(() => {
@@ -183,6 +192,19 @@ export function DeviceDetail() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      <div className="panel" style={{ marginTop: 20 }}>
+        <h2>Resource metrics</h2>
+        {samples.length === 0 ? (
+          <div className="empty">No metrics reported yet.</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20 }}>
+            <Sparkline label="CPU" values={metricSeries(samples, "cpu_pct")} />
+            <Sparkline label="Memory" values={metricSeries(samples, "mem_pct")} />
+            <Sparkline label="Disk" values={metricSeries(samples, "disk_pct")} />
           </div>
         )}
       </div>
