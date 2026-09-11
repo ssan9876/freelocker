@@ -3,6 +3,7 @@
 # Then open http://localhost:8080 (console UI arrives in plan 1c; until then use the API).
 # Set FREELOCKER_PUBLIC_HOSTNAMES to the DNS name/IP agents will use to reach this host.
 # BACK UP the serverdata volume: it holds master.key, without which the CA and signing keys cannot be decrypted.
+name: freelocker
 services:
   postgres:
     image: postgres:17

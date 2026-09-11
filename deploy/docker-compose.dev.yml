@@ -1,3 +1,6 @@
+# Separate project name so this never collides with docker-compose.yml
+# (both files live in deploy/, which would otherwise be the shared default).
+name: freelocker-dev
 services:
   postgres:
     image: postgres:17
