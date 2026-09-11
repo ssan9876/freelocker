@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -268,19 +270,26 @@ func (a *API) promoteObservation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := principalFrom(r)
-	if _, err := a.Store.AddRule(r.Context(), p.TenantID, pid, store.PolicyRule{
-		Kind: string(norm.Kind), Value: norm.Value, Description: norm.Description,
-	}, &p.Admin.ID); err != nil {
-		a.storeErr(w, err)
-		return
-	}
-	version, err := a.Runtime().Policy.Recompile(r.Context(), p.TenantID, pid)
+	version, err := a.addHashRule(r.Context(), p, pid, norm)
 	if err != nil {
 		a.storeErr(w, err)
 		return
 	}
 	a.audit(r, p, "policy.add_rule", "policy", pid.String(), map[string]any{"kind": "hash", "value": norm.Value, "via": "learning"}, "success")
 	writeJSON(w, http.StatusCreated, map[string]string{"version": version})
+}
+
+// addHashRule adds a normalized hash allow rule to a policy and recompiles
+// it, returning the new version. An identical rule already on the policy is
+// not an error, so retrying is safe.
+func (a *API) addHashRule(ctx context.Context, p principal, policyID uuid.UUID, rule rules.Rule) (string, error) {
+	_, err := a.Store.AddRule(ctx, p.TenantID, policyID, store.PolicyRule{
+		Kind: string(rule.Kind), Value: rule.Value, Description: rule.Description,
+	}, &p.Admin.ID)
+	if err != nil && !errors.Is(err, store.ErrConflict) {
+		return "", err
+	}
+	return a.Runtime().Policy.Recompile(ctx, p.TenantID, policyID)
 }
 
 func (a *API) listBlocks(w http.ResponseWriter, r *http.Request) {
