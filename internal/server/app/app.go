@@ -23,7 +23,9 @@ import (
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/keys"
 	"freelocker/internal/server/store"
+	"freelocker/internal/server/tokens"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
 
@@ -143,6 +145,49 @@ func (a *App) CreateAdmin(ctx context.Context, email, password, role string) err
 		Actor: "system", Action: "admin.create", TargetType: "admin", TargetID: id.String(),
 		Detail: map[string]any{"email": email, "role": role, "via": "cli"}, Result: "success",
 	})
+}
+
+// TokenForTests creates an unlimited install token. Intended for tests
+// and manual bring-up; requires the server to be initialized.
+func (a *App) TokenForTests(ctx context.Context) (string, error) {
+	rt := a.runtime()
+	if rt == nil {
+		return "", errors.New("not initialized")
+	}
+	full, hash, err := tokens.Generate(rt.Keys.CA.Pin())
+	if err != nil {
+		return "", err
+	}
+	if _, err := a.store.CreateInstallToken(ctx, rt.Keys.TenantID, store.InstallToken{Name: "bring-up"}, hash); err != nil {
+		return "", err
+	}
+	return full, nil
+}
+
+// ActivateForTests starts the agent API and runtime for an already
+// Initialize-d server, without serving the console. Tests that need a
+// live agent endpoint call this instead of Run.
+func (a *App) ActivateForTests(ctx context.Context) error {
+	k, err := bootstrap.Load(ctx, a.store, a.master)
+	if err != nil {
+		return err
+	}
+	return a.activate(k)
+}
+
+// Store exposes the underlying store (tests and CLI recovery).
+func (a *App) Store() *store.Store { return a.store }
+
+// Hub exposes the connection hub (tests).
+func (a *App) Hub() *hub.Hub { return a.hub }
+
+// Tenant returns the initialized tenant id (tests).
+func (a *App) Tenant() (uuid.UUID, bool) {
+	rt := a.runtime()
+	if rt == nil {
+		return uuid.Nil, false
+	}
+	return rt.Keys.TenantID, true
 }
 
 func (a *App) setup(ctx context.Context, org, email, password string) error {
