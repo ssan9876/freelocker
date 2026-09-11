@@ -130,6 +130,7 @@ const (
 	Agent_GetPolicy_FullMethodName        = "/freelocker.v1.Agent/GetPolicy"
 	Agent_Observe_FullMethodName          = "/freelocker.v1.Agent/Observe"
 	Agent_ReportBlocks_FullMethodName     = "/freelocker.v1.Agent/ReportBlocks"
+	Agent_ReportMetrics_FullMethodName    = "/freelocker.v1.Agent/ReportMetrics"
 )
 
 // AgentClient is the client API for Agent service.
@@ -143,6 +144,7 @@ type AgentClient interface {
 	GetPolicy(ctx context.Context, in *GetPolicyRequest, opts ...grpc.CallOption) (*GetPolicyResponse, error)
 	Observe(ctx context.Context, in *ObserveRequest, opts ...grpc.CallOption) (*Ack, error)
 	ReportBlocks(ctx context.Context, in *ReportBlocksRequest, opts ...grpc.CallOption) (*Ack, error)
+	ReportMetrics(ctx context.Context, in *MetricsRequest, opts ...grpc.CallOption) (*Ack, error)
 }
 
 type agentClient struct {
@@ -206,6 +208,16 @@ func (c *agentClient) ReportBlocks(ctx context.Context, in *ReportBlocksRequest,
 	return out, nil
 }
 
+func (c *agentClient) ReportMetrics(ctx context.Context, in *MetricsRequest, opts ...grpc.CallOption) (*Ack, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Ack)
+	err := c.cc.Invoke(ctx, Agent_ReportMetrics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentServer is the server API for Agent service.
 // All implementations must embed UnimplementedAgentServer
 // for forward compatibility.
@@ -217,6 +229,7 @@ type AgentServer interface {
 	GetPolicy(context.Context, *GetPolicyRequest) (*GetPolicyResponse, error)
 	Observe(context.Context, *ObserveRequest) (*Ack, error)
 	ReportBlocks(context.Context, *ReportBlocksRequest) (*Ack, error)
+	ReportMetrics(context.Context, *MetricsRequest) (*Ack, error)
 	mustEmbedUnimplementedAgentServer()
 }
 
@@ -241,6 +254,9 @@ func (UnimplementedAgentServer) Observe(context.Context, *ObserveRequest) (*Ack,
 }
 func (UnimplementedAgentServer) ReportBlocks(context.Context, *ReportBlocksRequest) (*Ack, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReportBlocks not implemented")
+}
+func (UnimplementedAgentServer) ReportMetrics(context.Context, *MetricsRequest) (*Ack, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReportMetrics not implemented")
 }
 func (UnimplementedAgentServer) mustEmbedUnimplementedAgentServer() {}
 func (UnimplementedAgentServer) testEmbeddedByValue()               {}
@@ -342,6 +358,24 @@ func _Agent_ReportBlocks_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Agent_ReportMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MetricsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).ReportMetrics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_ReportMetrics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).ReportMetrics(ctx, req.(*MetricsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Agent_ServiceDesc is the grpc.ServiceDesc for Agent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -364,6 +398,10 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReportBlocks",
 			Handler:    _Agent_ReportBlocks_Handler,
+		},
+		{
+			MethodName: "ReportMetrics",
+			Handler:    _Agent_ReportMetrics_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

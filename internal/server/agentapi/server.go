@@ -8,6 +8,7 @@ import (
 	"time"
 
 	flv1 "freelocker/gen/freelocker/v1"
+	"freelocker/internal/server/alerting"
 	"freelocker/internal/server/bootstrap"
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/policysvc"
@@ -24,6 +25,7 @@ type Deps struct {
 	Hub      *hub.Hub
 	Commands CommandSink        // optional
 	Policy   *policysvc.Service // optional; enables GetPolicy
+	Alerting *alerting.Service  // optional; evaluates metrics on report
 	Now      func() time.Time
 	Log      *slog.Logger
 }

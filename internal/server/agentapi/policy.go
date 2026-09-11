@@ -60,3 +60,19 @@ func (s *agentService) ReportBlocks(ctx context.Context, req *flv1.ReportBlocksR
 	}
 	return &flv1.Ack{}, nil
 }
+
+func (s *agentService) ReportMetrics(ctx context.Context, req *flv1.MetricsRequest) (*flv1.Ack, error) {
+	dev := deviceFrom(ctx)
+	now := s.d.Now()
+	sample := store.MetricSample{CPUPct: req.GetCpuPct(), MemPct: req.GetMemPct(), DiskPct: req.GetDiskPct(), At: now}
+	if err := s.d.Store.RecordMetrics(ctx, dev.TenantID, dev.ID, sample, now); err != nil {
+		s.d.Log.Error("record metrics", "device", dev.ID, "err", err)
+		return nil, status.Error(codes.Internal, "could not record metrics")
+	}
+	if s.d.Alerting != nil {
+		if err := s.d.Alerting.Evaluate(ctx, dev.TenantID, dev.ID, sample, now); err != nil {
+			s.d.Log.Error("evaluate alerts", "device", dev.ID, "err", err)
+		}
+	}
+	return &flv1.Ack{}, nil
+}

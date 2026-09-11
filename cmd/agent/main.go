@@ -80,7 +80,7 @@ func runAgent(log *slog.Logger) error {
 	inv := inventory.New()
 	r := &runner.Runner{
 		ServerURL: cfg.ServerURL, Identity: st, Inventory: inv,
-		HeartbeatInterval: 30 * time.Second, Log: log,
+		HeartbeatInterval: 30 * time.Second, MetricsInterval: 60 * time.Second, Log: log,
 	}
 	act := &actions.Actions{
 		Identity: st, Paths: paths, ServerURL: cfg.ServerURL, Log: log,

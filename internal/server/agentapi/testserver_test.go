@@ -9,6 +9,7 @@ import (
 
 	"freelocker/internal/server/agentapi"
 	"freelocker/internal/server/bootstrap"
+	"freelocker/internal/server/alerting"
 	"freelocker/internal/server/commands"
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/policysvc"
@@ -61,5 +62,6 @@ func newDeps(s *store.Store, k *bootstrap.Keys) agentapi.Deps {
 		Store: s, Keys: k, Hub: h,
 		Commands: &commands.Service{Store: s, Keys: k, Hub: h},
 		Policy:   &policysvc.Service{Store: s, Keys: k},
+		Alerting: alerting.New(s),
 	}
 }

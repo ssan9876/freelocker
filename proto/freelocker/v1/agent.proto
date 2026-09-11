@@ -16,6 +16,13 @@ service Agent {
   rpc GetPolicy(GetPolicyRequest) returns (GetPolicyResponse);
   rpc Observe(ObserveRequest) returns (Ack);
   rpc ReportBlocks(ReportBlocksRequest) returns (Ack);
+  rpc ReportMetrics(MetricsRequest) returns (Ack);
+}
+
+message MetricsRequest {
+  double cpu_pct = 1;
+  double mem_pct = 2;
+  double disk_pct = 3;
 }
 
 message Ack {}

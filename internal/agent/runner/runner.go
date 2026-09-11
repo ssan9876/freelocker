@@ -15,6 +15,7 @@ import (
 	"freelocker/internal/agent/executor"
 	"freelocker/internal/agent/identity"
 	"freelocker/internal/agent/inventory"
+	"freelocker/internal/agent/metrics"
 	"freelocker/internal/agent/scan"
 	"freelocker/internal/server/ca"
 	"freelocker/internal/server/commands"
@@ -43,6 +44,11 @@ type Runner struct {
 	UpdatePub          ed25519.PublicKey
 	Scan               func() ([]scan.Observed, error)
 	AppControlInterval time.Duration
+
+	// Telemetry (optional). When MetricsInterval > 0, the runner reports a
+	// resource sample on that interval. Metrics defaults to metrics.Collect.
+	MetricsInterval time.Duration
+	Metrics         func() (metrics.Sample, error)
 }
 
 func HardwareInfo(c inventory.Collector) *flv1.HardwareInfo {
@@ -127,6 +133,9 @@ func (r *Runner) session(ctx context.Context, connected func()) error {
 
 	if r.Enforcer != nil {
 		go r.appControlLoop(ctx, client)
+	}
+	if r.MetricsInterval > 0 {
+		go r.metricsLoop(ctx, client)
 	}
 
 	recv := make(chan *flv1.ServerMessage, 16)
@@ -237,6 +246,36 @@ func (r *Runner) reportObservations(ctx context.Context, client flv1.AgentClient
 	}
 	if _, err := client.Observe(ctx, &flv1.ObserveRequest{Apps: apps}); err != nil {
 		r.log().Warn("report observations", "err", err)
+	}
+}
+
+func (r *Runner) metricsLoop(ctx context.Context, client flv1.AgentClient) {
+	collect := r.Metrics
+	if collect == nil {
+		collect = metrics.Collect
+	}
+	report := func() {
+		s, err := collect()
+		if err != nil {
+			r.log().Warn("collect metrics", "err", err)
+			return
+		}
+		if _, err := client.ReportMetrics(ctx, &flv1.MetricsRequest{
+			CpuPct: s.CPUPct, MemPct: s.MemPct, DiskPct: s.DiskPct,
+		}); err != nil {
+			r.log().Warn("report metrics", "err", err)
+		}
+	}
+	report()
+	t := time.NewTicker(r.MetricsInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			report()
+		}
 	}
 }
 
