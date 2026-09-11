@@ -9,6 +9,7 @@ import (
 
 	flv1 "freelocker/gen/freelocker/v1"
 	"freelocker/internal/server/bootstrap"
+	"freelocker/internal/server/hub"
 	"freelocker/internal/server/store"
 
 	"google.golang.org/grpc"
@@ -17,10 +18,12 @@ import (
 )
 
 type Deps struct {
-	Store *store.Store
-	Keys  *bootstrap.Keys
-	Now   func() time.Time
-	Log   *slog.Logger
+	Store    *store.Store
+	Keys     *bootstrap.Keys
+	Hub      *hub.Hub
+	Commands CommandSink // optional
+	Now      func() time.Time
+	Log      *slog.Logger
 }
 
 // TLSConfig issues a fresh agent-facing server certificate from the
@@ -49,11 +52,17 @@ func NewGRPCServer(d Deps, tlsCfg *tls.Config) *grpc.Server {
 	if d.Log == nil {
 		d.Log = slog.Default()
 	}
+	if d.Hub == nil {
+		d.Hub = hub.New()
+	}
 	srv := grpc.NewServer(
 		grpc.Creds(credentials.NewTLS(tlsCfg)),
+		grpc.ChainUnaryInterceptor(d.unaryAuth),
+		grpc.ChainStreamInterceptor(d.streamAuth),
 		grpc.KeepaliveParams(keepalive.ServerParameters{Time: 60 * time.Second, Timeout: 20 * time.Second}),
 		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{MinTime: 20 * time.Second, PermitWithoutStream: true}),
 	)
 	flv1.RegisterEnrollmentServer(srv, &enrollService{d: d})
+	flv1.RegisterAgentServer(srv, &agentService{d: d})
 	return srv
 }
