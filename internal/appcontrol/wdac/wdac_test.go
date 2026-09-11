@@ -63,6 +63,66 @@ func TestCompilePropagatesRuleErrors(t *testing.T) {
 	}
 }
 
+// Every policy — including the empty default — must carry Microsoft's
+// DefaultWindows baseline so Windows itself is never blocked.
+func TestWindowsBaselineAlwaysPresent(t *testing.T) {
+	for _, p := range []Policy{
+		{Mode: "audit"},
+		{Mode: "enforce", Rules: []rules.Rule{hashRule(hex64("c"))}},
+	} {
+		xml, err := Compile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := string(xml)
+		for _, want := range []string{
+			`<EKU ID="ID_EKU_WINDOWS" Value="010A2B0601040182370A0306" />`,
+			`<CertRoot Type="Wellknown" Value="06" />`, // Microsoft Product Root 2010
+			`<CertEKU ID="ID_EKU_WINDOWS" />`,
+			`<SigningScenario Value="131" ID="ID_SIGNINGSCENARIO_KMCI"`,
+			`<SigningScenario Value="12" ID="ID_SIGNINGSCENARIO_UMCI"`,
+			`<AllowedSigner SignerId="ID_SIGNER_WINDOWS_PRODUCTION" />`,
+			`<AllowedSigner SignerId="ID_SIGNER_WINDOWS_PRODUCTION_USER" />`,
+			`Enabled:Update Policy No Reboot`,
+			`Enabled:Revoked Expired As Unsigned`,
+		} {
+			if !strings.Contains(s, want) {
+				t.Errorf("mode %s: baseline missing %q", p.Mode, want)
+			}
+		}
+		for _, unwanted := range []string{
+			`Enabled:Advanced Boot Options Menu`,
+			`Value="0A"`, // Microsoft test root
+			`Enabled:Allow Supplemental Policies`,
+		} {
+			if strings.Contains(s, unwanted) {
+				t.Errorf("mode %s: must not contain %q", p.Mode, unwanted)
+			}
+		}
+	}
+}
+
+// Admin publisher rules apply to user-mode code only; kernel mode stays
+// limited to the Microsoft baseline.
+func TestPublisherRulesAreUserModeOnly(t *testing.T) {
+	xml, err := Compile(Policy{Rules: []rules.Rule{{Kind: rules.Publisher, Value: hex64("d"), PublisherName: "Acme"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(xml)
+	k, u := strings.Index(s, `ID="ID_SIGNINGSCENARIO_KMCI"`), strings.Index(s, `ID="ID_SIGNINGSCENARIO_UMCI"`)
+	if k < 0 || u < 0 || k > u {
+		t.Fatalf("want a kernel-mode scenario followed by a user-mode one (kmci at %d, umci at %d)", k, u)
+	}
+	kmci, umci := s[k:u], s[u:]
+	if !strings.Contains(umci, `SignerId="ID_SIGNER_P_0"`) {
+		t.Error("publisher rule must be allowed in user mode")
+	}
+	if strings.Contains(kmci, `SignerId="ID_SIGNER_P_0"`) {
+		t.Error("publisher rule must not be allowed in kernel mode")
+	}
+}
+
 // hex64 returns a 64-char hex string seeded by c.
 func hex64(c string) string {
 	return strings.ToUpper(strings.Repeat(c, 64)[:64])
