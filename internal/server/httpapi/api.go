@@ -68,9 +68,6 @@ func (a *API) Handler() http.Handler {
 	return r
 }
 
-// routes registers resource endpoints; filled in by Task 13.
-func (a *API) routes(r chi.Router) {}
-
 func (a *API) requireRuntime(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if a.Runtime() == nil {

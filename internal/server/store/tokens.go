@@ -28,7 +28,7 @@ type InstallToken struct {
 func (s *Store) CreateDeviceGroup(ctx context.Context, tenantID uuid.UUID, name string) (uuid.UUID, error) {
 	id := uuid.New()
 	_, err := s.pool.Exec(ctx, `INSERT INTO device_groups (id, tenant_id, name) VALUES ($1, $2, $3)`, id, tenantID, name)
-	return id, err
+	return id, conflict(err)
 }
 
 func (s *Store) ListDeviceGroups(ctx context.Context, tenantID uuid.UUID) ([]DeviceGroup, error) {
