@@ -19,6 +19,7 @@ type Config struct {
 	MasterSecretFile string   `yaml:"master_secret_file"`
 	ConsoleTLSCert   string   `yaml:"console_tls_cert"`
 	ConsoleTLSKey    string   `yaml:"console_tls_key"`
+	InsecureCookies  bool     `yaml:"insecure_cookies"`
 }
 
 func Load(path string) (Config, error) {
@@ -43,6 +44,9 @@ func Load(path string) (Config, error) {
 	envStr(&c.MasterSecretFile, "FREELOCKER_MASTER_SECRET_FILE")
 	envStr(&c.ConsoleTLSCert, "FREELOCKER_CONSOLE_TLS_CERT")
 	envStr(&c.ConsoleTLSKey, "FREELOCKER_CONSOLE_TLS_KEY")
+	if os.Getenv("FREELOCKER_INSECURE_COOKIES") == "true" {
+		c.InsecureCookies = true
+	}
 	if v := os.Getenv("FREELOCKER_PUBLIC_HOSTNAMES"); v != "" {
 		c.PublicHostnames = strings.Split(v, ",")
 	}

@@ -1,0 +1,39 @@
+# Local (on-prem) install: server + Postgres.
+#   docker compose -f deploy/docker-compose.yml up -d --build
+# Then open http://localhost:8080 (console UI arrives in plan 1c; until then use the API).
+# Set FREELOCKER_PUBLIC_HOSTNAMES to the DNS name/IP agents will use to reach this host.
+# BACK UP the serverdata volume: it holds master.key, without which the CA and signing keys cannot be decrypted.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: freelocker
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: freelocker
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U freelocker"]
+      interval: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      FREELOCKER_DATABASE_URL: postgres://freelocker:${POSTGRES_PASSWORD:-change-me}@postgres:5432/freelocker?sslmode=disable
+      FREELOCKER_PUBLIC_HOSTNAMES: ${FREELOCKER_PUBLIC_HOSTNAMES:-localhost}
+      FREELOCKER_INSECURE_COOKIES: ${FREELOCKER_INSECURE_COOKIES:-false}
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - serverdata:/data
+
+volumes:
+  pgdata:
+  serverdata:

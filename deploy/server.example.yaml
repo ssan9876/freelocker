@@ -1,0 +1,10 @@
+# Copy to server.yaml and run: freelocker-server serve -config server.yaml
+# Every key can be overridden by an env var: FREELOCKER_<UPPER_SNAKE_KEY>.
+database_url: postgres://freelocker:change-me@localhost:5432/freelocker?sslmode=disable
+agent_listen: ":8443"          # gRPC for agents (mTLS). Behind a load balancer this must be TLS passthrough.
+console_listen: ":8080"        # REST API for the console
+public_hostnames: [localhost]  # names/IPs agents use to reach agent_listen (go into the server cert)
+master_secret_file: master.key # created on first run; back it up, keep it out of the database backup
+console_tls_cert: ""           # optional PEM cert/key for the console; leave empty behind a TLS proxy
+console_tls_key: ""
+insecure_cookies: false        # true only for plain-HTTP access to a non-localhost address (testing)
