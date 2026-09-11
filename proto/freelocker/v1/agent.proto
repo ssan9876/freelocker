@@ -17,6 +17,13 @@ service Agent {
   rpc Observe(ObserveRequest) returns (Ack);
   rpc ReportBlocks(ReportBlocksRequest) returns (Ack);
   rpc ReportMetrics(MetricsRequest) returns (Ack);
+  rpc GetControls(GetControlsRequest) returns (ControlsResponse);
+}
+
+message GetControlsRequest {}
+
+message ControlsResponse {
+  bool usb_storage_blocked = 1;
 }
 
 message MetricsRequest {

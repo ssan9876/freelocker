@@ -11,6 +11,7 @@ import (
 	"crypto/ed25519"
 
 	flv1 "freelocker/gen/freelocker/v1"
+	"freelocker/internal/agent/controls"
 	"freelocker/internal/agent/enforcer"
 	"freelocker/internal/agent/executor"
 	"freelocker/internal/agent/identity"
@@ -49,6 +50,10 @@ type Runner struct {
 	// resource sample on that interval. Metrics defaults to metrics.Collect.
 	MetricsInterval time.Duration
 	Metrics         func() (metrics.Sample, error)
+
+	// Device controls (optional). When Controls is set, the runner pulls
+	// and applies device controls on the app-control tick.
+	Controls controls.Enforcer
 }
 
 func HardwareInfo(c inventory.Collector) *flv1.HardwareInfo {
@@ -131,7 +136,7 @@ func (r *Runner) session(ctx context.Context, connected func()) error {
 	}
 	connected()
 
-	if r.Enforcer != nil {
+	if r.Enforcer != nil || r.Controls != nil {
 		go r.appControlLoop(ctx, client)
 	}
 	if r.MetricsInterval > 0 {
@@ -204,9 +209,28 @@ func (r *Runner) appControlLoop(ctx context.Context, client flv1.AgentClient) {
 }
 
 func (r *Runner) appControlTick(ctx context.Context, client flv1.AgentClient) {
-	r.syncPolicy(ctx, client)
-	r.reportObservations(ctx, client)
-	r.reportBlocks(ctx, client)
+	if r.Enforcer != nil {
+		r.syncPolicy(ctx, client)
+		r.reportObservations(ctx, client)
+		r.reportBlocks(ctx, client)
+	}
+	r.syncControls(ctx, client)
+}
+
+func (r *Runner) syncControls(ctx context.Context, client flv1.AgentClient) {
+	if r.Controls == nil {
+		return
+	}
+	resp, err := client.GetControls(ctx, &flv1.GetControlsRequest{})
+	if err != nil {
+		if status.Code(err) != codes.Unavailable {
+			r.log().Warn("get controls", "err", err)
+		}
+		return
+	}
+	if err := r.Controls.Apply(ctx, controls.Controls{USBStorageBlocked: resp.GetUsbStorageBlocked()}); err != nil {
+		r.log().Error("apply controls", "err", err)
+	}
 }
 
 func (r *Runner) syncPolicy(ctx context.Context, client flv1.AgentClient) {

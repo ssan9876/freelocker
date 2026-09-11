@@ -61,6 +61,19 @@ func (s *agentService) ReportBlocks(ctx context.Context, req *flv1.ReportBlocksR
 	return &flv1.Ack{}, nil
 }
 
+func (s *agentService) GetControls(ctx context.Context, _ *flv1.GetControlsRequest) (*flv1.ControlsResponse, error) {
+	dev := deviceFrom(ctx)
+	c, err := s.d.Store.EffectiveControlsForDevice(ctx, dev.TenantID, dev.ID)
+	if err == store.ErrNotFound {
+		return &flv1.ControlsResponse{}, nil // default allow
+	}
+	if err != nil {
+		s.d.Log.Error("resolve controls", "device", dev.ID, "err", err)
+		return nil, status.Error(codes.Internal, "could not resolve controls")
+	}
+	return &flv1.ControlsResponse{UsbStorageBlocked: c.USBStorageBlocked}, nil
+}
+
 func (s *agentService) ReportMetrics(ctx context.Context, req *flv1.MetricsRequest) (*flv1.Ack, error) {
 	dev := deviceFrom(ctx)
 	now := s.d.Now()
