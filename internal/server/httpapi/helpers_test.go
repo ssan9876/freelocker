@@ -46,7 +46,7 @@ func newEnv(t *testing.T) *env {
 	e.rt = func() *httpapi.Runtime { mu.Lock(); defer mu.Unlock(); return rt }
 
 	api := &httpapi.API{
-		Store: s, Hub: h, TOTPSealer: sealer, Sessions: &auth.Sessions{Store: s}, Runtime: e.rt,
+		Store: s, Hub: h, TOTPSealer: sealer, Sessions: &auth.Sessions{Store: s}, Runtime: e.rt, ReleaseDir: t.TempDir(),
 		Setup: func(ctx context.Context, org, email, pw string) error {
 			if _, err := bootstrap.Init(ctx, s, master, org, time.Now()); err != nil {
 				return err

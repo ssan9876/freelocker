@@ -29,6 +29,7 @@ type API struct {
 	Hub        *hub.Hub
 	TOTPSealer *keys.Sealer
 	Sessions   *auth.Sessions
+	ReleaseDir string
 	Now        func() time.Time
 	Log        *slog.Logger
 
@@ -50,6 +51,7 @@ func (a *API) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/api/setup/status", a.setupStatus)
 	r.Post("/api/setup", a.setup)
+	r.Get("/agent/releases/{version}", a.downloadRelease)
 	r.Group(func(r chi.Router) {
 		r.Use(a.requireRuntime)
 		r.Post("/api/login", a.login)

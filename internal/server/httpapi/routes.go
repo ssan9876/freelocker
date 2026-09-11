@@ -17,6 +17,7 @@ func (a *API) routes(r chi.Router) {
 	r.Get("/api/devices/{id}/commands", a.listDeviceCommands)
 	r.Get("/api/groups", a.listGroups)
 	r.Get("/api/tokens", a.listTokens)
+	r.Get("/api/releases", a.listReleases)
 	r.Get("/api/audit", a.listAudit)
 
 	r.Group(func(r chi.Router) {
@@ -33,6 +34,7 @@ func (a *API) routes(r chi.Router) {
 		r.Get("/api/admins", a.listAdmins)
 		r.Post("/api/admins", a.createAdmin)
 		r.Post("/api/admins/{id}/disable", a.disableAdmin)
+		r.Post("/api/releases", a.uploadRelease)
 	})
 }
 
