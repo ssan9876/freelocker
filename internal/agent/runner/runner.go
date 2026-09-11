@@ -8,10 +8,14 @@ import (
 	"math/rand/v2"
 	"time"
 
+	"crypto/ed25519"
+
 	flv1 "freelocker/gen/freelocker/v1"
+	"freelocker/internal/agent/enforcer"
 	"freelocker/internal/agent/executor"
 	"freelocker/internal/agent/identity"
 	"freelocker/internal/agent/inventory"
+	"freelocker/internal/agent/scan"
 	"freelocker/internal/server/ca"
 	"freelocker/internal/server/commands"
 	"freelocker/internal/sim"
@@ -30,6 +34,15 @@ type Runner struct {
 	HeartbeatInterval time.Duration
 	Log               *slog.Logger
 	Clock             func() time.Time
+
+	// Application control (optional). When Enforcer is set, the runner
+	// periodically pulls the assigned policy, verifies its signature with
+	// UpdatePub, applies it, reports observed apps, and forwards block
+	// events. Scan defaults to scan.Running.
+	Enforcer           enforcer.Enforcer
+	UpdatePub          ed25519.PublicKey
+	Scan               func() ([]scan.Observed, error)
+	AppControlInterval time.Duration
 }
 
 func HardwareInfo(c inventory.Collector) *flv1.HardwareInfo {
@@ -102,7 +115,8 @@ func (r *Runner) session(ctx context.Context, connected func()) error {
 		return err
 	}
 	defer conn.Close()
-	stream, err := flv1.NewAgentClient(conn).Connect(ctx)
+	client := flv1.NewAgentClient(conn)
+	stream, err := client.Connect(ctx)
 	if err != nil {
 		return err
 	}
@@ -110,6 +124,10 @@ func (r *Runner) session(ctx context.Context, connected func()) error {
 		return err
 	}
 	connected()
+
+	if r.Enforcer != nil {
+		go r.appControlLoop(ctx, client)
+	}
 
 	recv := make(chan *flv1.ServerMessage, 16)
 	recvErr := make(chan error, 1)
@@ -147,9 +165,95 @@ func (r *Runner) session(ctx context.Context, connected func()) error {
 }
 
 func (r *Runner) heartbeat(stream flv1.Agent_ConnectClient) error {
+	inv := r.Inventory.Collect()
+	if r.Enforcer != nil {
+		inv.PolicyVersion = r.Enforcer.Status().AppliedVersion
+	}
 	return stream.Send(&flv1.AgentMessage{Body: &flv1.AgentMessage_Heartbeat{Heartbeat: &flv1.Heartbeat{
-		Inventory: r.Inventory.Collect(), SentAtUnix: r.now().Unix(),
+		Inventory: inv, SentAtUnix: r.now().Unix(),
 	}}})
+}
+
+// appControlLoop pulls and applies policy, reports observed apps, and
+// forwards block events until the session's context is cancelled.
+func (r *Runner) appControlLoop(ctx context.Context, client flv1.AgentClient) {
+	interval := r.AppControlInterval
+	if interval <= 0 {
+		interval = 5 * time.Minute
+	}
+	r.appControlTick(ctx, client)
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			r.appControlTick(ctx, client)
+		}
+	}
+}
+
+func (r *Runner) appControlTick(ctx context.Context, client flv1.AgentClient) {
+	r.syncPolicy(ctx, client)
+	r.reportObservations(ctx, client)
+	r.reportBlocks(ctx, client)
+}
+
+func (r *Runner) syncPolicy(ctx context.Context, client flv1.AgentClient) {
+	resp, err := client.GetPolicy(ctx, &flv1.GetPolicyRequest{})
+	if err != nil {
+		if status.Code(err) != codes.Unavailable {
+			r.log().Warn("get policy", "err", err)
+		}
+		return
+	}
+	if resp.GetVersion() == r.Enforcer.Status().AppliedVersion {
+		return
+	}
+	if !ed25519.Verify(r.UpdatePub, []byte(resp.GetVersion()), resp.GetSignature()) {
+		r.log().Error("policy signature invalid; not applying", "version", resp.GetVersion())
+		return
+	}
+	if err := r.Enforcer.Apply(ctx, resp.GetVersion(), resp.GetMode(), resp.GetXml()); err != nil {
+		r.log().Error("apply policy", "version", resp.GetVersion(), "err", err)
+		return
+	}
+	r.log().Info("applied policy", "version", resp.GetVersion(), "mode", resp.GetMode())
+}
+
+func (r *Runner) reportObservations(ctx context.Context, client flv1.AgentClient) {
+	scanFn := r.Scan
+	if scanFn == nil {
+		scanFn = scan.Running
+	}
+	obs, err := scanFn()
+	if err != nil || len(obs) == 0 {
+		return
+	}
+	apps := make([]*flv1.ObservedApp, 0, len(obs))
+	for _, o := range obs {
+		apps = append(apps, &flv1.ObservedApp{Sha256: o.SHA256, Path: o.Path, Signer: o.Signer})
+	}
+	if _, err := client.Observe(ctx, &flv1.ObserveRequest{Apps: apps}); err != nil {
+		r.log().Warn("report observations", "err", err)
+	}
+}
+
+func (r *Runner) reportBlocks(ctx context.Context, client flv1.AgentClient) {
+	events, err := r.Enforcer.Events(ctx)
+	if err != nil || len(events) == 0 {
+		return
+	}
+	out := make([]*flv1.BlockEvent, 0, len(events))
+	for _, e := range events {
+		out = append(out, &flv1.BlockEvent{
+			Sha256: e.SHA256, Path: e.Path, Signer: e.Signer, Blocked: e.Blocked, AtUnix: e.At.Unix(),
+		})
+	}
+	if _, err := client.ReportBlocks(ctx, &flv1.ReportBlocksRequest{Events: out}); err != nil {
+		r.log().Warn("report blocks", "err", err)
+	}
 }
 
 func (r *Runner) handleCommand(ctx context.Context, stream flv1.Agent_ConnectClient, l *identity.Loaded, sc *flv1.SignedCommand) {

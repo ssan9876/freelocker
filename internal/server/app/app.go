@@ -192,6 +192,15 @@ func (a *App) ActivateForTests(ctx context.Context) error {
 	return a.activate(k)
 }
 
+// KeysForTest returns the loaded server keys (tests only).
+func (a *App) KeysForTest() *bootstrap.Keys {
+	rt := a.runtime()
+	if rt == nil {
+		return nil
+	}
+	return rt.Keys
+}
+
 // Store exposes the underlying store (tests and CLI recovery).
 func (a *App) Store() *store.Store { return a.store }
 

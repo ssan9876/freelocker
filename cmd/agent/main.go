@@ -15,6 +15,7 @@ import (
 	"freelocker/internal/agent/actions"
 	"freelocker/internal/agent/agentpaths"
 	"freelocker/internal/agent/config"
+	"freelocker/internal/agent/enforcer"
 	"freelocker/internal/agent/executor"
 	"freelocker/internal/agent/identity"
 	"freelocker/internal/agent/inventory"
@@ -100,6 +101,7 @@ func runAgent(log *slog.Logger) error {
 		Uninstaller: uninstaller(paths),
 	}
 	r.Executor = &executor.Executor{Actions: act, Log: log}
+	r.Enforcer = enforcer.Default(paths.DataDir)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
@@ -112,6 +114,10 @@ func runAgent(log *slog.Logger) error {
 			return err
 		}
 		log.Info("enrolled")
+	}
+	// The update-signing key (learned at enrollment) also verifies policy.
+	if l, err := st.Load(); err == nil {
+		r.UpdatePub = ed25519.PublicKey(l.UpdatePub)
 	}
 	return service.Run(ctx, r)
 }
