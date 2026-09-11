@@ -90,6 +90,43 @@ func (a *API) deleteAlertRule(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (a *API) getControls(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	c, err := a.Store.GetControls(r.Context(), principalFrom(r).TenantID, id)
+	if err == store.ErrNotFound {
+		writeJSON(w, http.StatusOK, map[string]bool{"usb_storage_blocked": false})
+		return
+	}
+	if err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"usb_storage_blocked": c.USBStorageBlocked})
+}
+
+func (a *API) setControls(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		USBStorageBlocked bool `json:"usb_storage_blocked"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	p := principalFrom(r)
+	if err := a.Store.SetControls(r.Context(), p.TenantID, id, store.DeviceControls{USBStorageBlocked: req.USBStorageBlocked}); err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	a.audit(r, p, "controls.set", "group", id.String(), map[string]any{"usb_storage_blocked": req.USBStorageBlocked}, "success")
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (a *API) listAlerts(w http.ResponseWriter, r *http.Request) {
 	alerts, err := a.Store.ListAlerts(r.Context(), principalFrom(r).TenantID, queryInt(r, "limit", 200, 1000))
 	if err != nil {

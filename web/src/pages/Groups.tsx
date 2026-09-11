@@ -2,15 +2,39 @@ import { FormEvent, useEffect, useState } from "react";
 import { api, ApiError, Group } from "../api";
 import { useToast } from "../components/Toast";
 
+type Controls = { usb_storage_blocked: boolean };
+
 export function Groups() {
   const { notify } = useToast();
   const [groups, setGroups] = useState<Group[] | null>(null);
+  const [controls, setControls] = useState<Record<string, boolean>>({});
   const [name, setName] = useState("");
 
-  const load = () => api.get<Group[]>("/api/groups").then(setGroups).catch(() => setGroups([]));
+  const load = () =>
+    api
+      .get<Group[]>("/api/groups")
+      .then((gs) => {
+        setGroups(gs);
+        gs.forEach((g) =>
+          api
+            .get<Controls>(`/api/groups/${g.id}/controls`)
+            .then((c) => setControls((prev) => ({ ...prev, [g.id]: c.usb_storage_blocked })))
+            .catch(() => {})
+        );
+      })
+      .catch(() => setGroups([]));
   useEffect(() => {
     load();
   }, []);
+
+  const toggleUSB = async (id: string, blocked: boolean) => {
+    try {
+      await api.post(`/api/groups/${id}/controls`, { usb_storage_blocked: blocked });
+      setControls((prev) => ({ ...prev, [id]: blocked }));
+    } catch (e) {
+      notify(e instanceof ApiError ? e.message : "Could not update controls", "error");
+    }
+  };
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
@@ -51,6 +75,7 @@ export function Groups() {
             <thead>
               <tr>
                 <th>Name</th>
+                <th>USB storage</th>
                 <th className="mono">ID</th>
               </tr>
             </thead>
@@ -58,6 +83,15 @@ export function Groups() {
               {groups.map((g) => (
                 <tr key={g.id}>
                   <td>{g.name}</td>
+                  <td>
+                    <select
+                      value={controls[g.id] ? "block" : "allow"}
+                      onChange={(e) => toggleUSB(g.id, e.target.value === "block")}
+                    >
+                      <option value="allow">Allowed</option>
+                      <option value="block">Blocked</option>
+                    </select>
+                  </td>
                   <td className="mono">{g.id}</td>
                 </tr>
               ))}

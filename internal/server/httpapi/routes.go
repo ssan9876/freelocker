@@ -26,6 +26,7 @@ func (a *API) routes(r chi.Router) {
 	r.Get("/api/blocks", a.listBlocks)
 	r.Get("/api/alert-rules", a.listAlertRules)
 	r.Get("/api/alerts", a.listAlerts)
+	r.Get("/api/groups/{id}/controls", a.getControls)
 
 	r.Group(func(r chi.Router) {
 		r.Use(a.requireRole("admin"))
@@ -44,6 +45,7 @@ func (a *API) routes(r chi.Router) {
 		r.Post("/api/observations/promote", a.promoteObservation)
 		r.Post("/api/alert-rules", a.createAlertRule)
 		r.Delete("/api/alert-rules/{id}", a.deleteAlertRule)
+		r.Post("/api/groups/{id}/controls", a.setControls)
 	})
 
 	r.Group(func(r chi.Router) {
