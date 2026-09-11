@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, ApiError, Command, DeviceDetail as Detail } from "../api";
+import { api, ApiError, Command, DeviceDetail as Detail, Observation, Policy } from "../api";
 import { StatusDot } from "../components/StatusDot";
 import { Confirm } from "../components/Confirm";
 import { useToast } from "../components/Toast";
@@ -19,12 +19,33 @@ export function DeviceDetail() {
   const { notify } = useToast();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [cmds, setCmds] = useState<Command[]>([]);
+  const [obs, setObs] = useState<Observation[]>([]);
+  const [policies, setPolicies] = useState<Policy[]>([]);
+  const [promoteTo, setPromoteTo] = useState("");
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = () => {
     api.get<Detail>(`/api/devices/${id}`).then(setDetail).catch(() => setDetail(null));
     api.get<Command[]>(`/api/devices/${id}/commands?limit=25`).then(setCmds).catch(() => {});
+    api.get<Observation[]>(`/api/devices/${id}/observations?limit=100`).then(setObs).catch(() => {});
+  };
+
+  useEffect(() => {
+    api.get<Policy[]>("/api/policies").then(setPolicies).catch(() => {});
+  }, []);
+
+  const promote = async (sha256: string, description: string) => {
+    if (!promoteTo) {
+      notify("Choose a policy first", "error");
+      return;
+    }
+    try {
+      await api.post("/api/observations/promote", { policy_id: promoteTo, sha256, description });
+      notify("Added to policy");
+    } catch (e) {
+      notify(e instanceof ApiError ? e.message : "Could not add rule", "error");
+    }
   };
 
   useEffect(() => {
@@ -163,6 +184,56 @@ export function DeviceDetail() {
               </tbody>
             </table>
           </div>
+        )}
+      </div>
+
+      <div className="panel" style={{ marginTop: 20 }}>
+        <h2>Observed applications</h2>
+        <p className="who" style={{ marginTop: -8 }}>
+          Programs this device has run (learning mode). Add one to a policy to allow it by hash.
+        </p>
+        {obs.length === 0 ? (
+          <div className="empty">Nothing observed yet.</div>
+        ) : (
+          <>
+            <div className="toolbar">
+              <label style={{ margin: 0 }}>Add to policy</label>
+              <select value={promoteTo} onChange={(e) => setPromoteTo(e.target.value)}>
+                <option value="">Choose policy…</option>
+                {policies.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="table-wrap" style={{ border: "none" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Path</th>
+                    <th>SHA-256</th>
+                    <th>Count</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {obs.map((o) => (
+                    <tr key={o.sha256 + o.path}>
+                      <td className="mono">{o.path}</td>
+                      <td className="mono">{o.sha256.slice(0, 16)}…</td>
+                      <td className="mono">{o.count}</td>
+                      <td>
+                        <button className="ghost" onClick={() => promote(o.sha256, o.path)}>
+                          Add as rule
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

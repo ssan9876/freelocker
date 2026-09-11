@@ -38,6 +38,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
+  del: <T>(path: string) => request<T>("DELETE", path),
   async upload<T>(path: string, form: FormData): Promise<T> {
     const headers: Record<string, string> = {};
     if (csrf) headers["X-CSRF-Token"] = csrf;
@@ -110,3 +111,29 @@ export type Audit = {
   created_at: string;
 };
 export type Release = { version: string; sha256: string; uploaded_at: string };
+export type Policy = { id: string; name: string; mode: "audit" | "enforce"; created_at: string };
+export type PolicyRule = {
+  id: string;
+  kind: "hash" | "publisher" | "path";
+  value: string;
+  publisher_name: string;
+  description: string;
+};
+export type PolicyDetail = { policy: Policy; rules: PolicyRule[]; version: string };
+export type Observation = {
+  sha256: string;
+  path: string;
+  signer: string;
+  count: number;
+  first_seen: string;
+  last_seen: string;
+};
+export type BlockEvent = {
+  id: number;
+  device_id: string;
+  sha256: string;
+  path: string;
+  signer: string;
+  blocked: boolean;
+  at: string;
+};
