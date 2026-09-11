@@ -20,6 +20,7 @@ type Config struct {
 	ConsoleTLSCert   string   `yaml:"console_tls_cert"`
 	ConsoleTLSKey    string   `yaml:"console_tls_key"`
 	InsecureCookies  bool     `yaml:"insecure_cookies"`
+	ReleaseDir       string   `yaml:"release_dir"`
 }
 
 func Load(path string) (Config, error) {
@@ -28,6 +29,7 @@ func Load(path string) (Config, error) {
 		ConsoleListen:    ":8080",
 		PublicHostnames:  []string{"localhost"},
 		MasterSecretFile: "master.key",
+		ReleaseDir:       "releases",
 	}
 	if path != "" {
 		b, err := os.ReadFile(path)
@@ -44,6 +46,7 @@ func Load(path string) (Config, error) {
 	envStr(&c.MasterSecretFile, "FREELOCKER_MASTER_SECRET_FILE")
 	envStr(&c.ConsoleTLSCert, "FREELOCKER_CONSOLE_TLS_CERT")
 	envStr(&c.ConsoleTLSKey, "FREELOCKER_CONSOLE_TLS_KEY")
+	envStr(&c.ReleaseDir, "FREELOCKER_RELEASE_DIR")
 	if os.Getenv("FREELOCKER_INSECURE_COOKIES") == "true" {
 		c.InsecureCookies = true
 	}

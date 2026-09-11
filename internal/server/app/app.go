@@ -24,6 +24,7 @@ import (
 	"freelocker/internal/server/keys"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/tokens"
+	"freelocker/internal/server/webui"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -76,9 +77,24 @@ func NewWithStore(cfg config.Config, s *store.Store, master []byte, log *slog.Lo
 	a := &App{cfg: cfg, store: s, master: master, log: log, hub: hub.New()}
 	api := &httpapi.API{
 		Store: s, Runtime: a.runtime, Setup: a.setup, Hub: a.hub, TOTPSealer: totpSealer,
-		Sessions: &auth.Sessions{Store: s, Secure: !cfg.InsecureCookies}, Log: log,
+		Sessions: &auth.Sessions{Store: s, Secure: !cfg.InsecureCookies}, ReleaseDir: cfg.ReleaseDir, Log: log,
 	}
-	a.handler = api.Handler()
+	apiHandler := api.Handler()
+
+	// The API owns /api and /agent; everything else is the embedded SPA
+	// (when a console build is present).
+	mux := http.NewServeMux()
+	mux.Handle("/api/", apiHandler)
+	mux.Handle("/agent/", apiHandler)
+	if webui.Enabled() {
+		mux.Handle("/", webui.Handler())
+	} else {
+		mux.Handle("/", apiHandler)
+		if log != nil {
+			log.Info("console UI not embedded; serving API only")
+		}
+	}
+	a.handler = mux
 	return a, nil
 }
 
