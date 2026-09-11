@@ -1,0 +1,46 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="FreeLocker Agent" Manufacturer="FreeLocker" Version="0.1.0.0"
+           UpgradeCode="7B3F5B1E-9C4D-4E2A-9F2B-1A2B3C4D5E6F" Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of FreeLocker Agent is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Property Id="SERVERURL" Secure="yes" />
+    <Property Id="TOKEN" Secure="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLDIR" Name="FreeLocker" />
+    </StandardDirectory>
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="DATADIR" Name="FreeLocker" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="Files" Directory="INSTALLDIR">
+      <Component Id="AgentExe">
+        <File Id="AgentExe" Source="freelocker-agent.exe" KeyPath="yes" />
+        <ServiceInstall Id="AgentSvc" Name="FreeLockerAgent" DisplayName="FreeLocker Agent"
+                        Type="ownProcess" Start="auto" ErrorControl="normal" Account="LocalSystem"
+                        Description="FreeLocker endpoint agent." Arguments="run" />
+        <ServiceControl Id="AgentSvcCtl" Name="FreeLockerAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+      </Component>
+      <Component Id="UpdaterExe">
+        <File Id="UpdaterExe" Source="agent-updater.exe" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Component Id="ConfigFile" Directory="DATADIR" Guid="4C1E9A77-6C1B-4B0A-8E2D-2F3A4B5C6D7E">
+      <File Id="ConfigYaml" Source="config.yaml" KeyPath="yes" />
+    </Component>
+
+    <CustomAction Id="WriteConfig" Directory="INSTALLDIR"
+                  ExeCommand="&quot;[INSTALLDIR]freelocker-agent.exe&quot; write-config -server &quot;[SERVERURL]&quot; -token &quot;[TOKEN]&quot;"
+                  Execute="deferred" Impersonate="no" Return="check" />
+    <InstallExecuteSequence>
+      <Custom Action="WriteConfig" Before="StartServices" Condition="SERVERURL" />
+    </InstallExecuteSequence>
+
+    <Feature Id="Main">
+      <ComponentGroupRef Id="Files" />
+      <ComponentRef Id="ConfigFile" />
+    </Feature>
+  </Package>
+</Wix>
