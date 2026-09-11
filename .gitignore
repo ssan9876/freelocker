@@ -7,3 +7,4 @@ sim-state.json
 # web stage; only the embed placeholder is tracked.
 /internal/server/webui/dist/*
 !/internal/server/webui/dist/.gitkeep
+/server.yaml
