@@ -36,6 +36,14 @@ the fastest recovery from anything below.
 | 7 | Self-update to 0.2.1 | `agent-manual-test.md` step 10 | | |
 | 8 | Uninstall / revoke | `agent-manual-test.md` steps 11–13 | | |
 
+### What to expect from policies
+Every policy includes Microsoft's DefaultWindows baseline, so Windows'
+own programs and drivers are always allowed. In audit mode only
+third-party software shows up as "Would block (audit)" and in
+*Approvals*. Enforce mode likewise blocks only third-party software that
+isn't allowed. The server recompiles every stored policy at startup, so
+restart it after upgrading before starting the run.
+
 ### Stage 1 notes
 Install the MSI from Setup step 5 with `SERVERURL=<dev-box-ip>:8443` and the
 token from Setup step 6. The device page should show agent version **0.2.0**.

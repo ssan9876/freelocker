@@ -230,6 +230,14 @@ func (a *App) setup(ctx context.Context, org, email, password string) error {
 func (a *App) activate(k *bootstrap.Keys) error {
 	cmds := &commands.Service{Store: a.store, Keys: k, Hub: a.hub, Log: a.log}
 	policy := &policysvc.Service{Store: a.store, Keys: k}
+	// Rebuild every policy with the current compiler so devices never keep
+	// a version compiled by an older one. Failure is logged, not fatal: the
+	// existing versions stay, and the next admin edit recompiles anyway.
+	if n, err := policy.RecompileAll(context.Background(), k.TenantID); err != nil {
+		a.log.Error("recompile policies at startup", "err", err)
+	} else if n > 0 {
+		a.log.Info("recompiled policies", "count", n)
+	}
 	alerts := alerting.New(a.store)
 	tlsCfg, err := agentapi.TLSConfig(k, a.cfg.PublicHostnames, time.Now())
 	if err != nil {

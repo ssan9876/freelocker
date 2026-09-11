@@ -17,7 +17,7 @@ Windows 11 / Server 2022+ (has `CiTool.exe`).
 4. **Confirm the agent applied it.** Within ~5 min the device's heartbeat shows the policy version; on the VM:
    - `C:\ProgramData\FreeLocker\policy.xml` and `policy.cip` exist.
    - `CiTool --list-policies` lists the FreeLocker base policy `{A244370E-…}` as active, **Audit** enforcement.
-5. **Generate an audit event.** Run an application that is *not* allowed. It still runs (audit mode). Within a minute the console's *Blocked programs* page shows it as "Would block (audit)".
+5. **Generate an audit event.** Run a non-Microsoft application that is *not* allowed. It still runs (audit mode). Within a minute the console's *Blocked programs* page shows it as "Would block (audit)". Windows' own programs never appear there: every policy includes Microsoft's DefaultWindows baseline (Windows components, WHQL drivers, Store apps), so only third-party software needs rules.
 6. **Review** the block events and add any legitimately-needed apps as rules until the audit list is clean.
 
 ## Enforce mode (VM only, has a recovery path)
@@ -34,5 +34,6 @@ Windows 11 / Server 2022+ (has `CiTool.exe`).
 - Worst case: boot into recovery and delete `C:\Windows\System32\CodeIntegrity\CiPolicies\Active\*.cip`, then reboot.
 
 ## What automated tests already cover (so this doc stays short)
-- Rule validation/normalization, deterministic WDAC XML + versioning, policy store/versioning/assignment, effective-policy resolution and signing, the GetPolicy/Observe/ReportBlocks RPCs, the console policy API, the enforcer interface, file hashing, CodeIntegrity XML parsing, and the full agent app-control loop (with a test enforcer).
-- **Not** covered here: that Windows' `ConvertFrom-CIPolicy` accepts the generated XML and that `CiTool` activates it — that is exactly what steps 4–5 above verify. If `ConvertFrom-CIPolicy` rejects the XML, capture the error and iterate on `internal/appcontrol/wdac`.
+- Rule validation/normalization, deterministic WDAC XML + versioning, the Microsoft baseline in every policy, policy store/versioning/assignment, recompiling all policies at server startup, effective-policy resolution and signing, the GetPolicy/Observe/ReportBlocks RPCs, the console policy API, the enforcer interface, Authenticode file hashing, CodeIntegrity XML parsing, and the full agent app-control loop (with a test enforcer).
+- **Windows accepts the XML:** a Windows-only test (`internal/appcontrol/wdac/wdac_windows_test.go`) converts empty, hash, path, publisher and mixed policies in both modes with `ConvertFrom-CIPolicy` on any Windows dev box. It only writes a `.cip` to a temp dir; nothing is deployed.
+- **Not** covered here: that `CiTool` activates the policy and CodeIntegrity enforces it as expected — that is exactly what steps 4–5 above verify.

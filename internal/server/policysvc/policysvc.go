@@ -52,8 +52,31 @@ func (s *Service) Recompile(ctx context.Context, tenantID, policyID uuid.UUID) (
 	return version, nil
 }
 
-// EffectiveXML is the compiled policy a device should apply, or a default
-// deny-all audit policy when the device has no assignment.
+// RecompileAll rebuilds every policy for the tenant with the current
+// compiler, so versions produced by an older compiler are superseded. It
+// keeps going past a policy that fails to compile and returns how many
+// succeeded along with the first error.
+func (s *Service) RecompileAll(ctx context.Context, tenantID uuid.UUID) (int, error) {
+	ps, err := s.Store.ListPolicies(ctx, tenantID)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	var firstErr error
+	for _, p := range ps {
+		if _, err := s.Recompile(ctx, tenantID, p.ID); err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("recompile policy %s: %w", p.Name, err)
+			}
+			continue
+		}
+		n++
+	}
+	return n, firstErr
+}
+
+// Effective is the compiled policy a device should apply, or a default
+// Windows-only audit policy when the device has no assignment.
 type Effective struct {
 	Version   string
 	Mode      string
@@ -73,7 +96,8 @@ func (s *Service) Effective(ctx context.Context, tenantID, deviceID uuid.UUID) (
 }
 
 // denyAll is the safe default for an unassigned device: an audit-mode
-// policy with no allow rules (logs would-be blocks, blocks nothing).
+// policy with no admin rules, so only Microsoft's Windows baseline is
+// allowed (logs would-be blocks of everything else, blocks nothing).
 func (s *Service) denyAll() (Effective, error) {
 	xml, err := wdac.Compile(wdac.Policy{Mode: "audit"})
 	if err != nil {

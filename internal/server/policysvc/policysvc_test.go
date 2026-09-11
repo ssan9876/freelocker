@@ -56,6 +56,37 @@ func TestRecompileSignsAndVersions(t *testing.T) {
 	}
 }
 
+// RecompileAll rebuilds every policy so versions compiled by an older
+// compiler (e.g. XML Windows rejects) are replaced at startup.
+func TestRecompileAllReplacesStaleVersions(t *testing.T) {
+	ctx := context.Background()
+	s, k := setup(t)
+	svc := &policysvc.Service{Store: s, Keys: k}
+
+	var ids []uuid.UUID
+	for _, name := range []string{"A", "B"} {
+		pid, _ := s.CreatePolicy(ctx, k.TenantID, name, "audit")
+		if err := s.PutPolicyVersion(ctx, k.TenantID, store.PolicyVersion{
+			PolicyID: pid, Version: "stale-" + name, Mode: "audit", XML: []byte("<old/>"), Signature: []byte("x"),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, pid)
+	}
+	time.Sleep(10 * time.Millisecond) // new versions must sort after the stale ones
+
+	n, err := svc.RecompileAll(ctx, k.TenantID)
+	if err != nil || n != 2 {
+		t.Fatalf("RecompileAll = %d, %v; want 2, nil", n, err)
+	}
+	for _, pid := range ids {
+		v, err := s.LatestPolicyVersion(ctx, k.TenantID, pid)
+		if err != nil || !bytes.Contains(v.XML, []byte("<PlatformID>")) || bytes.HasPrefix([]byte(v.Version), []byte("stale-")) {
+			t.Errorf("policy %s latest = %q (%d bytes xml), %v", pid, v.Version, len(v.XML), err)
+		}
+	}
+}
+
 func TestEffectiveFallsBackToDenyAll(t *testing.T) {
 	ctx := context.Background()
 	s, k := setup(t)
