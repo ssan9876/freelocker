@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package freelocker.v1;
+
+option go_package = "freelocker/gen/freelocker/v1;flv1";
+
+// Enrollment is called over server-authenticated TLS (no client cert yet).
+service Enrollment {
+  rpc Enroll(EnrollRequest) returns (EnrollResponse);
+}
+
+// Agent requires mTLS with a device certificate issued at enrollment.
+service Agent {
+  rpc Connect(stream AgentMessage) returns (stream ServerMessage);
+  rpc RenewCertificate(RenewRequest) returns (RenewResponse);
+}
+
+message HardwareInfo {
+  string hostname = 1;
+  string os_build = 2;
+  string machine_guid = 3;
+}
+
+message EnrollRequest {
+  string token_secret = 1; // secret part of the install token (before the ".")
+  bytes csr_der = 2;
+  HardwareInfo hardware = 3;
+}
+
+message EnrollResponse {
+  string device_id = 1;
+  bytes cert_der = 2;
+  bytes ca_cert_der = 3;
+  bytes command_signing_public_key = 4;
+  bytes update_signing_public_key = 5;
+  bytes uninstall_code_sha256 = 6;
+}
+
+message Inventory {
+  string hostname = 1;
+  string os_build = 2;
+  repeated string ip_addresses = 3;
+  string logged_on_user = 4;
+  string agent_version = 5;
+  int64 uptime_seconds = 6;
+}
+
+message Heartbeat {
+  Inventory inventory = 1;
+  int64 sent_at_unix = 2;
+}
+
+message CommandResult {
+  string command_id = 1;
+  bool success = 2;
+  string message = 3;
+}
+
+// Goodbye is sent on clean service shutdown so the server can tell
+// "stopped normally" from "went silent".
+message Goodbye {
+  string reason = 1;
+}
+
+message AgentMessage {
+  oneof body {
+    Heartbeat heartbeat = 1;
+    CommandResult command_result = 2;
+    Goodbye goodbye = 3;
+  }
+}
+
+enum CommandType {
+  COMMAND_TYPE_UNSPECIFIED = 0;
+  COMMAND_TYPE_PING = 1;
+  COMMAND_TYPE_REFRESH_INVENTORY = 2;
+  COMMAND_TYPE_ROTATE_CERTIFICATE = 3;
+  COMMAND_TYPE_UNINSTALL = 4;
+  COMMAND_TYPE_UPDATE_AGENT = 5;
+}
+
+message Command {
+  string id = 1;
+  CommandType type = 2;
+  string device_id = 3;
+  int64 issued_at_unix = 4;
+  int64 expires_at_unix = 5;
+  bytes payload = 6;
+}
+
+// command is the deterministic serialization of Command; signature is
+// Ed25519 over those exact bytes.
+message SignedCommand {
+  bytes command = 1;
+  bytes signature = 2;
+}
+
+message ServerMessage {
+  oneof body {
+    SignedCommand command = 1;
+  }
+}
+
+message RenewRequest {
+  bytes csr_der = 1;
+}
+
+message RenewResponse {
+  bytes cert_der = 1;
+}

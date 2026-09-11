@@ -1,0 +1,5 @@
+/bin/
+*.exe
+/web/node_modules/
+/web/dist/
+sim-state.json
