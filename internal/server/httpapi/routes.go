@@ -22,7 +22,10 @@ func (a *API) routes(r chi.Router) {
 	r.Get("/api/policies", a.listPolicies)
 	r.Get("/api/policies/{id}", a.getPolicy)
 	r.Get("/api/devices/{id}/observations", a.listObservations)
+	r.Get("/api/devices/{id}/metrics", a.listMetrics)
 	r.Get("/api/blocks", a.listBlocks)
+	r.Get("/api/alert-rules", a.listAlertRules)
+	r.Get("/api/alerts", a.listAlerts)
 
 	r.Group(func(r chi.Router) {
 		r.Use(a.requireRole("admin"))
@@ -39,6 +42,8 @@ func (a *API) routes(r chi.Router) {
 		r.Post("/api/policies/{id}/assign", a.assignPolicy)
 		r.Post("/api/policies/{id}/recompile", a.recompilePolicy)
 		r.Post("/api/observations/promote", a.promoteObservation)
+		r.Post("/api/alert-rules", a.createAlertRule)
+		r.Delete("/api/alert-rules/{id}", a.deleteAlertRule)
 	})
 
 	r.Group(func(r chi.Router) {
