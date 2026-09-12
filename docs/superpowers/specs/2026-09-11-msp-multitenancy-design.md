@@ -45,11 +45,25 @@ with a provider-level super-admin who can create and switch between tenants.
    (no change to their experience).
 
 ## Phased plan (each phase ships green, no regression to single-tenant)
-- **Phase 1 — per-tenant keys, no UX change.** Introduce `TenantKeys` and route
-  enrollment, agent stream, commands, policy, and controls through it keyed by
-  the token's/device's tenant. Single-tenant behavior is unchanged (one tenant
-  in the cache). Pure refactor; existing tests must stay green, plus a test that
-  two tenants with two CAs each enroll and operate in isolation.
+- **Phase 1 — per-tenant application-layer keys. DONE.** Added
+  `internal/server/keyset.Provider` (`For(ctx, tenantID)`, cached) and a
+  `keyset.Func` resolver threaded through enrollment (device-cert signing +
+  enrollment response), the agent stream (certificate renewal), commands
+  (signing), and policy (compile/sign + effective/deny-all), keyed by the
+  token's/device's tenant; `bootstrap.ProvisionTenant` creates a tenant with
+  its own CA + keys. When no resolver is set the single `Keys` is used, so
+  single-tenant behavior is unchanged (all existing tests green).
+  `keyset.TestPerTenantKeyIsolation` proves two tenants get distinct CAs and
+  that one tenant's key neither signs nor verifies another's policy.
+- **Phase 1b — per-tenant transport (the remaining hard part).** The agent
+  mTLS still uses one tenant's CA for the *server* certificate and client-CA
+  pool, so a second tenant's agent cannot yet complete the handshake or enroll
+  over the wire (its token pins its own CA, which the server doesn't present).
+  Fix: server `tls.Config.GetCertificate` selects a per-tenant server cert by
+  SNI (agents send a tenant marker, e.g. the CA pin, as ServerName; the cert's
+  SAN carries it), and `ClientCAs` becomes the union of all tenant CAs. This is
+  handshake-sensitive and gets its own careful pass with the two-tenant
+  over-the-wire enrollment test.
 - **Phase 2 — global-email login.** Add the global-unique-email migration and
   `GetAdminByEmailGlobal`; login resolves tenant from the admin. Test: two
   tenants, an admin in each, each logs into their own tenant; duplicate email

@@ -23,6 +23,7 @@ import (
 	"freelocker/internal/server/httpapi"
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/keys"
+	"freelocker/internal/server/keyset"
 	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/tokens"
@@ -34,13 +35,14 @@ import (
 )
 
 type App struct {
-	cfg       config.Config
-	store     *store.Store
-	ownsStore bool
-	master    []byte
-	log       *slog.Logger
-	hub       *hub.Hub
-	handler   http.Handler
+	cfg         config.Config
+	store       *store.Store
+	ownsStore   bool
+	master      []byte
+	log         *slog.Logger
+	hub         *hub.Hub
+	handler     http.Handler
+	keyProvider *keyset.Provider
 
 	setupMu   sync.Mutex
 	mu        sync.Mutex
@@ -77,10 +79,11 @@ func NewWithStore(cfg config.Config, s *store.Store, master []byte, log *slog.Lo
 	if err != nil {
 		return nil, err
 	}
-	a := &App{cfg: cfg, store: s, master: master, log: log, hub: hub.New()}
+	a := &App{cfg: cfg, store: s, master: master, log: log, hub: hub.New(), keyProvider: keyset.New(s, master)}
 	api := &httpapi.API{
 		Store: s, Runtime: a.runtime, Setup: a.setup, Hub: a.hub, TOTPSealer: totpSealer,
-		Sessions: &auth.Sessions{Store: s, Secure: !cfg.InsecureCookies}, ReleaseDir: cfg.ReleaseDir, Log: log,
+		Sessions: &auth.Sessions{Store: s, Secure: !cfg.InsecureCookies}, ReleaseDir: cfg.ReleaseDir,
+		KeyFor: a.keyProvider.For, Log: log,
 	}
 	apiHandler := api.Handler()
 
@@ -231,8 +234,8 @@ func (a *App) setup(ctx context.Context, org, email, password string) error {
 }
 
 func (a *App) activate(k *bootstrap.Keys) error {
-	cmds := &commands.Service{Store: a.store, Keys: k, Hub: a.hub, Log: a.log}
-	policy := &policysvc.Service{Store: a.store, Keys: k}
+	cmds := &commands.Service{Store: a.store, Keys: k, KeyFor: a.keyProvider.For, Hub: a.hub, Log: a.log}
+	policy := &policysvc.Service{Store: a.store, Keys: k, KeyFor: a.keyProvider.For}
 	// Rebuild every policy with the current compiler so devices never keep
 	// a version compiled by an older one. Failure is logged, not fatal: the
 	// existing versions stay, and the next admin edit recompiles anyway.
@@ -250,7 +253,7 @@ func (a *App) activate(k *bootstrap.Keys) error {
 	if err != nil {
 		return fmt.Errorf("agent listener: %w", err)
 	}
-	srv := agentapi.NewGRPCServer(agentapi.Deps{Store: a.store, Keys: k, Hub: a.hub, Commands: cmds, Policy: policy, Alerting: alerts, Log: a.log}, tlsCfg)
+	srv := agentapi.NewGRPCServer(agentapi.Deps{Store: a.store, Keys: k, KeyFor: a.keyProvider.For, Hub: a.hub, Commands: cmds, Policy: policy, Alerting: alerts, Log: a.log}, tlsCfg)
 	go func() {
 		if err := srv.Serve(lis); err != nil {
 			a.log.Error("agent API stopped", "err", err)

@@ -38,12 +38,21 @@ type Keys struct {
 	uninstallKey []byte
 }
 
+// Init creates the first tenant with its own CA and signing keys. It
+// refuses if any tenant already exists (use ProvisionTenant to add more).
 func Init(ctx context.Context, s *store.Store, master []byte, tenantName string, now time.Time) (uuid.UUID, error) {
 	if _, err := s.FirstTenant(ctx); err == nil {
 		return uuid.Nil, ErrAlreadyInitialized
 	} else if !errors.Is(err, store.ErrNotFound) {
 		return uuid.Nil, err
 	}
+	return ProvisionTenant(ctx, s, master, tenantName, now)
+}
+
+// ProvisionTenant creates a new tenant with its own CA and command/update
+// signing keys (no single-tenant guard). Used by Init and by provider-level
+// tenant creation (MSP).
+func ProvisionTenant(ctx context.Context, s *store.Store, master []byte, tenantName string, now time.Time) (uuid.UUID, error) {
 	sealer, err := keys.NewSealer(master, sealPurpose)
 	if err != nil {
 		return uuid.Nil, err
@@ -76,11 +85,17 @@ func Init(ctx context.Context, s *store.Store, master []byte, tenantName string,
 	return tenant, nil
 }
 
+// Load loads the first tenant's keys (single-tenant convenience).
 func Load(ctx context.Context, s *store.Store, master []byte) (*Keys, error) {
 	tenant, err := s.FirstTenant(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load tenant (run `freelocker-server init` first?): %w", err)
 	}
+	return LoadForTenant(ctx, s, master, tenant)
+}
+
+// LoadForTenant loads a specific tenant's CA and signing keys.
+func LoadForTenant(ctx context.Context, s *store.Store, master []byte, tenant uuid.UUID) (*Keys, error) {
 	sealer, err := keys.NewSealer(master, sealPurpose)
 	if err != nil {
 		return nil, err

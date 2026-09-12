@@ -91,7 +91,12 @@ func (a *API) createToken(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "unknown group_id")
 		return
 	}
-	full, hash, err := tokens.Generate(a.Runtime().Keys.CA.Pin())
+	tk, err := a.keysFor(r.Context(), p.TenantID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "could not resolve tenant key")
+		return
+	}
+	full, hash, err := tokens.Generate(tk.CA.Pin())
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not generate token")
 		return

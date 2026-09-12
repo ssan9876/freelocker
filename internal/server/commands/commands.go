@@ -9,6 +9,7 @@ import (
 	flv1 "freelocker/gen/freelocker/v1"
 	"freelocker/internal/server/bootstrap"
 	"freelocker/internal/server/hub"
+	"freelocker/internal/server/keyset"
 	"freelocker/internal/server/store"
 
 	"github.com/google/uuid"
@@ -19,9 +20,21 @@ const DefaultTTL = 24 * time.Hour
 type Service struct {
 	Store *store.Store
 	Keys  *bootstrap.Keys
-	Hub   *hub.Hub
-	Now   func() time.Time
-	Log   *slog.Logger
+	// KeyFor, when set, resolves per-tenant keys (multi-tenant); otherwise
+	// the single Keys is used.
+	KeyFor keyset.Func
+	Hub    *hub.Hub
+	Now    func() time.Time
+	Log    *slog.Logger
+}
+
+// keys resolves the signing keys for a tenant: the per-tenant provider when
+// set, else the single configured Keys.
+func (s *Service) keys(ctx context.Context, tenantID uuid.UUID) (*bootstrap.Keys, error) {
+	if s.KeyFor != nil {
+		return s.KeyFor(ctx, tenantID)
+	}
+	return s.Keys, nil
 }
 
 func (s *Service) now() time.Time {
@@ -75,7 +88,12 @@ func (s *Service) deliver(ctx context.Context, tenantID uuid.UUID, c store.Comma
 		s.log().Error("stored command has unknown type", "command", c.ID, "type", c.Type)
 		return
 	}
-	sc, err := Sign(s.Keys.CommandKey, &flv1.Command{
+	k, err := s.keys(ctx, tenantID)
+	if err != nil {
+		s.log().Error("resolve keys for command", "command", c.ID, "err", err)
+		return
+	}
+	sc, err := Sign(k.CommandKey, &flv1.Command{
 		Id: c.ID.String(), Type: typ, DeviceId: c.DeviceID.String(),
 		IssuedAtUnix: c.IssuedAt.Unix(), ExpiresAtUnix: c.ExpiresAt.Unix(), Payload: c.Payload,
 	})

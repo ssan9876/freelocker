@@ -12,11 +12,22 @@ import (
 	"freelocker/internal/server/commands"
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/keys"
+	"freelocker/internal/server/keyset"
 	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/store"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
+
+// keysFor resolves a tenant's keys: the per-tenant provider when set, else
+// the Runtime's single keys.
+func (a *API) keysFor(ctx context.Context, tenantID uuid.UUID) (*bootstrap.Keys, error) {
+	if a.KeyFor != nil {
+		return a.KeyFor(ctx, tenantID)
+	}
+	return a.Runtime().Keys, nil
+}
 
 type Runtime struct {
 	Keys     *bootstrap.Keys
@@ -32,8 +43,11 @@ type API struct {
 	TOTPSealer *keys.Sealer
 	Sessions   *auth.Sessions
 	ReleaseDir string
-	Now        func() time.Time
-	Log        *slog.Logger
+	// KeyFor resolves per-tenant keys; when nil the Runtime's single keys
+	// are used (single-tenant).
+	KeyFor keyset.Func
+	Now    func() time.Time
+	Log    *slog.Logger
 
 	limiter *loginLimiter
 }

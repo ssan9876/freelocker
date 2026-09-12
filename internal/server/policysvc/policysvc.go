@@ -10,6 +10,7 @@ import (
 	"freelocker/internal/appcontrol/rules"
 	"freelocker/internal/appcontrol/wdac"
 	"freelocker/internal/server/bootstrap"
+	"freelocker/internal/server/keyset"
 	"freelocker/internal/server/store"
 
 	"github.com/google/uuid"
@@ -18,6 +19,16 @@ import (
 type Service struct {
 	Store *store.Store
 	Keys  *bootstrap.Keys
+	// KeyFor, when set, resolves per-tenant keys (multi-tenant); otherwise
+	// the single Keys is used.
+	KeyFor keyset.Func
+}
+
+func (s *Service) keys(ctx context.Context, tenantID uuid.UUID) (*bootstrap.Keys, error) {
+	if s.KeyFor != nil {
+		return s.KeyFor(ctx, tenantID)
+	}
+	return s.Keys, nil
 }
 
 // Recompile builds the current rule set into a signed WDAC version and
@@ -42,7 +53,11 @@ func (s *Service) Recompile(ctx context.Context, tenantID, policyID uuid.UUID) (
 		return "", fmt.Errorf("compile policy: %w", err)
 	}
 	version := wdac.ContentHash(xml)
-	sig := ed25519.Sign(s.Keys.UpdateKey, []byte(version))
+	k, err := s.keys(ctx, tenantID)
+	if err != nil {
+		return "", err
+	}
+	sig := ed25519.Sign(k.UpdateKey, []byte(version))
 	err = s.Store.PutPolicyVersion(ctx, tenantID, store.PolicyVersion{
 		PolicyID: policyID, Version: version, Mode: p.Mode, XML: xml, Signature: sig,
 	})
@@ -87,7 +102,7 @@ type Effective struct {
 func (s *Service) Effective(ctx context.Context, tenantID, deviceID uuid.UUID) (Effective, error) {
 	v, err := s.Store.EffectivePolicyForDevice(ctx, tenantID, deviceID)
 	if err == store.ErrNotFound {
-		return s.denyAll()
+		return s.denyAll(ctx, tenantID)
 	}
 	if err != nil {
 		return Effective{}, err
@@ -98,15 +113,19 @@ func (s *Service) Effective(ctx context.Context, tenantID, deviceID uuid.UUID) (
 // denyAll is the safe default for an unassigned device: an audit-mode
 // policy with no admin rules, so only Microsoft's Windows baseline is
 // allowed (logs would-be blocks of everything else, blocks nothing).
-func (s *Service) denyAll() (Effective, error) {
+func (s *Service) denyAll(ctx context.Context, tenantID uuid.UUID) (Effective, error) {
 	xml, err := wdac.Compile(wdac.Policy{Mode: "audit"})
 	if err != nil {
 		return Effective{}, err
 	}
 	version := wdac.ContentHash(xml)
+	k, err := s.keys(ctx, tenantID)
+	if err != nil {
+		return Effective{}, err
+	}
 	return Effective{
 		Version: version, Mode: "audit", XML: xml,
-		Signature: ed25519.Sign(s.Keys.UpdateKey, []byte(version)),
+		Signature: ed25519.Sign(k.UpdateKey, []byte(version)),
 	}, nil
 }
 

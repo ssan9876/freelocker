@@ -55,9 +55,13 @@ func (a *API) uploadRelease(w http.ResponseWriter, r *http.Request) {
 	}
 	out.Close()
 	sum := h.Sum(nil)
-	sig := ed25519.Sign(a.Runtime().Keys.UpdateKey, sum)
-
 	p := principalFrom(r)
+	k, err := a.keysFor(r.Context(), p.TenantID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "could not resolve signing key")
+		return
+	}
+	sig := ed25519.Sign(k.UpdateKey, sum)
 	if err := a.Store.PutRelease(r.Context(), p.TenantID, store.Release{Version: version, SHA256: sum, Signature: sig, UploadedAt: time.Now()}); err != nil {
 		a.storeErr(w, err)
 		return

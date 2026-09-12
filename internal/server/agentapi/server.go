@@ -7,12 +7,17 @@ import (
 	"log/slog"
 	"time"
 
+	"context"
 	flv1 "freelocker/gen/freelocker/v1"
+
 	"freelocker/internal/server/alerting"
 	"freelocker/internal/server/bootstrap"
 	"freelocker/internal/server/hub"
+	"freelocker/internal/server/keyset"
 	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/store"
+
+	"github.com/google/uuid"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -26,8 +31,18 @@ type Deps struct {
 	Commands CommandSink        // optional
 	Policy   *policysvc.Service // optional; enables GetPolicy
 	Alerting *alerting.Service  // optional; evaluates metrics on report
-	Now      func() time.Time
-	Log      *slog.Logger
+	// KeyFor, when set, resolves per-tenant keys (multi-tenant); otherwise
+	// the single Keys is used for enrollment and certificate renewal.
+	KeyFor keyset.Func
+	Now    func() time.Time
+	Log    *slog.Logger
+}
+
+func (d Deps) keys(ctx context.Context, tenantID uuid.UUID) (*bootstrap.Keys, error) {
+	if d.KeyFor != nil {
+		return d.KeyFor(ctx, tenantID)
+	}
+	return d.Keys, nil
 }
 
 // TLSConfig issues a fresh agent-facing server certificate from the

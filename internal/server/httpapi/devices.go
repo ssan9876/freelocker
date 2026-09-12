@@ -74,7 +74,9 @@ func (a *API) getDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := map[string]any{"device": a.toDeviceJSON(d, a.now())}
 	if auth.Allows(p.Admin.Role, "admin") {
-		resp["uninstall_code"] = a.Runtime().Keys.UninstallCode(id)
+		if k, err := a.keysFor(r.Context(), p.TenantID); err == nil {
+			resp["uninstall_code"] = k.UninstallCode(id)
+		}
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

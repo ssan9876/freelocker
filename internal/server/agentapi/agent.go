@@ -114,7 +114,11 @@ func (s *agentService) handle(ctx context.Context, dev device, m *flv1.AgentMess
 func (s *agentService) RenewCertificate(ctx context.Context, req *flv1.RenewRequest) (*flv1.RenewResponse, error) {
 	dev := deviceFrom(ctx)
 	now := s.d.Now()
-	der, serial, notAfter, err := s.d.Keys.CA.SignDevice(req.GetCsrDer(), dev.ID, now)
+	k, err := s.d.keys(ctx, dev.TenantID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "resolve tenant keys")
+	}
+	der, serial, notAfter, err := k.CA.SignDevice(req.GetCsrDer(), dev.ID, now)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
