@@ -1,12 +1,12 @@
 // Package alerting evaluates resource-metric samples against threshold
-// rules and raises or resolves alerts. Breach onset is tracked in memory
-// (single-instance v1); a multi-instance deployment would persist it.
+// rules and raises or resolves alerts. Breach onset is persisted in the
+// store so a sustained-duration rule is evaluated consistently across
+// server instances.
 package alerting
 
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"freelocker/internal/server/store"
@@ -16,12 +16,9 @@ import (
 
 type Service struct {
 	Store *store.Store
-
-	mu     sync.Mutex
-	breach map[string]time.Time // deviceID|ruleID -> first-breach time
 }
 
-func New(s *store.Store) *Service { return &Service{Store: s, breach: map[string]time.Time{}} }
+func New(s *store.Store) *Service { return &Service{Store: s} }
 
 func metricValue(m string, sample store.MetricSample) (float64, bool) {
 	switch m {
@@ -59,16 +56,21 @@ func (s *Service) Evaluate(ctx context.Context, tenantID, deviceID uuid.UUID, sa
 		if !ok {
 			continue
 		}
-		key := deviceID.String() + "|" + r.ID.String()
 		if breaching(r.Op, value, threshold(r)) {
-			if s.sustained(key, r.DurationSeconds, now) {
+			sustained, err := s.sustained(ctx, tenantID, deviceID, r.ID, r.DurationSeconds, now)
+			if err != nil {
+				return err
+			}
+			if sustained {
 				msg := fmt.Sprintf("%s %.0f%% %s %.0f%%", r.Metric, value, opWord(r.Op), r.Threshold)
 				if _, err := s.Store.RaiseAlert(ctx, tenantID, deviceID, r.ID, r.Metric, msg, now); err != nil {
 					return err
 				}
 			}
 		} else {
-			s.clear(key)
+			if err := s.Store.ClearBreach(ctx, tenantID, deviceID, r.ID); err != nil {
+				return err
+			}
 			if err := s.Store.ResolveAlert(ctx, tenantID, deviceID, r.ID, now); err != nil {
 				return err
 			}
@@ -87,23 +89,14 @@ func opWord(op string) string {
 }
 
 // sustained reports whether a breach has held for at least duration. For
-// duration 0 it is immediate.
-func (s *Service) sustained(key string, durationSeconds int, now time.Time) bool {
+// duration 0 it is immediate. Breach onset is recorded in the store.
+func (s *Service) sustained(ctx context.Context, tenantID, deviceID, ruleID uuid.UUID, durationSeconds int, now time.Time) (bool, error) {
 	if durationSeconds <= 0 {
-		return true
+		return true, nil
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	start, ok := s.breach[key]
-	if !ok {
-		s.breach[key] = now
-		return false
+	since, err := s.Store.MarkBreach(ctx, tenantID, deviceID, ruleID, now)
+	if err != nil {
+		return false, err
 	}
-	return now.Sub(start) >= time.Duration(durationSeconds)*time.Second
-}
-
-func (s *Service) clear(key string) {
-	s.mu.Lock()
-	delete(s.breach, key)
-	s.mu.Unlock()
+	return now.Sub(since) >= time.Duration(durationSeconds)*time.Second, nil
 }

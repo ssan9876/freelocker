@@ -1,8 +1,12 @@
 package httpapi
 
 import (
-	"sync"
+	"context"
 	"time"
+
+	"freelocker/internal/server/store"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -10,36 +14,27 @@ const (
 	failWindow  = 15 * time.Minute
 )
 
-// loginLimiter is an in-memory sliding-window failure counter. It is
-// per-process; a multi-instance deployment would move this to Postgres.
+// loginLimiter is a Postgres-backed sliding-window failure counter, so the
+// rate limit holds across all server instances rather than per process.
 type loginLimiter struct {
-	mu    sync.Mutex
-	fails map[string][]time.Time
+	store *store.Store
 }
 
-func newLoginLimiter() *loginLimiter { return &loginLimiter{fails: map[string][]time.Time{}} }
+func newLoginLimiter(s *store.Store) *loginLimiter { return &loginLimiter{store: s} }
 
-func (l *loginLimiter) allow(key string, now time.Time) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	recent := l.fails[key][:0]
-	for _, t := range l.fails[key] {
-		if now.Sub(t) < failWindow {
-			recent = append(recent, t)
-		}
+// allow reports whether another attempt is permitted for the key.
+func (l *loginLimiter) allow(ctx context.Context, tenantID uuid.UUID, key string, now time.Time) bool {
+	n, err := l.store.CountLoginFailures(ctx, tenantID, key, now.Add(-failWindow))
+	if err != nil {
+		return true // fail open: never lock out on a transient DB error
 	}
-	l.fails[key] = recent
-	return len(recent) < maxFailures
+	return n < maxFailures
 }
 
-func (l *loginLimiter) fail(key string, now time.Time) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.fails[key] = append(l.fails[key], now)
+func (l *loginLimiter) fail(ctx context.Context, tenantID uuid.UUID, key string, now time.Time) {
+	l.store.RecordLoginFailure(ctx, tenantID, key, now)
 }
 
-func (l *loginLimiter) reset(key string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	delete(l.fails, key)
+func (l *loginLimiter) reset(ctx context.Context, tenantID uuid.UUID, key string) {
+	l.store.ClearLoginFailures(ctx, tenantID, key)
 }

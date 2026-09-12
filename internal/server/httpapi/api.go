@@ -49,7 +49,7 @@ func (a *API) Handler() http.Handler {
 	if a.Log == nil {
 		a.Log = slog.Default()
 	}
-	a.limiter = newLoginLimiter()
+	a.limiter = newLoginLimiter(a.Store)
 	r := chi.NewRouter()
 	r.Get("/api/setup/status", a.setupStatus)
 	r.Post("/api/setup", a.setup)

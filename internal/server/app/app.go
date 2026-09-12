@@ -307,6 +307,10 @@ func (a *App) Run(ctx context.Context) error {
 					a.log.Info("expired stale commands", "count", n)
 				}
 			}
+			// Housekeeping: drop login failures older than the rate-limit window.
+			if _, err := a.store.PruneLoginFailures(ctx, time.Now().Add(-15*time.Minute)); err != nil {
+				a.log.Error("prune login failures", "err", err)
+			}
 		}
 	}
 }

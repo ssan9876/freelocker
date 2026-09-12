@@ -109,7 +109,7 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	key := auth.ClientIP(r) + "|" + email
 	now := a.now()
-	if !a.limiter.allow(key, now) {
+	if !a.limiter.allow(r.Context(), tenant, key, now) {
 		writeErr(w, http.StatusTooManyRequests, "too many failed attempts; try again later")
 		return
 	}
@@ -120,12 +120,12 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		hash = &admin.PasswordHash
 	}
 	if !auth.CheckPasswordOrDummy(hash, req.Password) {
-		a.limiter.fail(key, now)
+		a.limiter.fail(r.Context(), tenant, key, now)
 		a.audit(r, principal{TenantID: tenant, Admin: store.Admin{Email: email}}, "admin.login", "admin", "", map[string]any{"stage": "password"}, "failure")
 		writeErr(w, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
-	a.limiter.reset(key)
+	a.limiter.reset(r.Context(), tenant, key)
 
 	sess, err := a.Sessions.Create(r.Context(), w, r, tenant, admin.ID)
 	if err != nil {
@@ -172,18 +172,18 @@ func (a *API) mfaVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	key := "mfa|" + p.Session.ID
 	now := a.now()
-	if !a.limiter.allow(key, now) {
+	if !a.limiter.allow(r.Context(), p.TenantID, key, now) {
 		writeErr(w, http.StatusTooManyRequests, "too many failed attempts; try again later")
 		return
 	}
 	secret, err := a.TOTPSealer.Open(p.Admin.TOTPSecretEnc)
 	if err != nil || !auth.ValidateTOTP(string(secret), strings.TrimSpace(req.Code), now) {
-		a.limiter.fail(key, now)
+		a.limiter.fail(r.Context(), p.TenantID, key, now)
 		a.audit(r, p, "admin.login", "admin", p.Admin.ID.String(), map[string]any{"stage": "mfa"}, "failure")
 		writeErr(w, http.StatusUnauthorized, "invalid code")
 		return
 	}
-	a.limiter.reset(key)
+	a.limiter.reset(r.Context(), p.TenantID, key)
 	if !p.Admin.TOTPConfirmed {
 		if err := a.Store.SetAdminTOTP(r.Context(), p.TenantID, p.Admin.ID, p.Admin.TOTPSecretEnc, true); err != nil {
 			writeErr(w, http.StatusInternalServerError, "could not confirm MFA")
