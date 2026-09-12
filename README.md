@@ -38,6 +38,17 @@ touching the server or protocol.
 | 4 | Device control (USB storage) | **Built & tested**; live registry enforcement verified on a VM |
 | 5 | Kernel driver (real-time allow/deny) | **Design only** — needs WDK, EV cert + attestation, kernel-debug VM (see `docs/superpowers/specs/2026-09-10-kernel-driver-design.md`) |
 
+Beyond the sub-projects, the platform also has: **interactive approvals**
+(a would-block becomes an approval request an admin approves as a hash or
+path rule); **richer device controls** (network and elevation, not just
+USB); **telemetry event streams** (process launches and logons on an
+Activity page); **health/readiness probes** and **Let's Encrypt** console
+TLS; **multi-instance safety** (the login rate-limiter and alert breach
+state live in Postgres) and **time-series retention**; a **GitHub Actions
+CI** pipeline (Go tests + Postgres, Windows cross-compile, console build,
+Playwright E2E). **MSP multi-tenancy** is designed and phased in
+`docs/superpowers/specs/2026-09-11-msp-multitenancy-design.md`.
+
 Anything that could lock or destabilize a real machine (WDAC enforcement,
 USB blocking, service install) **defaults to safe/audit mode and is
 verified only on a disposable VM** — never against the dev machine. See the
