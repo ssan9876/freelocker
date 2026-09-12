@@ -38,6 +38,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
+  patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),
   del: <T>(path: string) => request<T>("DELETE", path),
   async upload<T>(path: string, form: FormData): Promise<T> {
     const headers: Record<string, string> = {};
@@ -51,7 +52,7 @@ export const api = {
 };
 
 export type Me = { id: string; email: string; role: string; provider: boolean };
-export type Tenant = { id: string; name: string; created_at: string };
+export type Tenant = { id: string; name: string; suspended: boolean; created_at: string };
 export type SetupStatus = { initialized: boolean };
 export type LoginResult = { csrf_token: string; mfa_enrolled: boolean };
 export type MfaSetup = { secret: string; otpauth_url: string };

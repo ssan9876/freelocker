@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, ApiError, Group } from "../api";
+import { Confirm } from "../components/Confirm";
 import { useToast } from "../components/Toast";
 
 type Controls = { usb_storage_blocked: boolean; network_blocked: boolean; elevation_blocked: boolean };
@@ -11,6 +12,9 @@ export function Groups() {
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [controls, setControls] = useState<Record<string, Controls>>({});
   const [name, setName] = useState("");
+  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState<Group | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const load = () =>
     api
@@ -50,6 +54,33 @@ export function Groups() {
     }
   };
 
+  const rename = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editing) return;
+    try {
+      await api.patch(`/api/groups/${editing.id}`, { name: editing.name });
+      setEditing(null);
+      load();
+    } catch (e) {
+      notify(e instanceof ApiError ? e.message : "Could not rename group", "error");
+    }
+  };
+
+  const remove = async () => {
+    if (!deleting) return;
+    setBusy(true);
+    try {
+      await api.del(`/api/groups/${deleting.id}`);
+      notify("Group deleted");
+      setDeleting(null);
+      load();
+    } catch (e) {
+      notify(e instanceof ApiError ? e.message : "Could not delete group", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div>
       <div className="page-head">
@@ -82,6 +113,7 @@ export function Groups() {
                 <th>Network</th>
                 <th>Elevation</th>
                 <th className="mono">ID</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -95,17 +127,59 @@ export function Groups() {
                 );
                 return (
                   <tr key={g.id}>
-                    <td>{g.name}</td>
+                    <td>
+                      {editing?.id === g.id ? (
+                        <form onSubmit={rename} style={{ display: "flex", gap: 6 }}>
+                          <input
+                            autoFocus
+                            aria-label="Group name"
+                            value={editing.name}
+                            onChange={(e) => setEditing({ id: g.id, name: e.target.value })}
+                          />
+                          <button className="primary" disabled={!editing.name.trim()}>
+                            Save
+                          </button>
+                          <button type="button" className="ghost" onClick={() => setEditing(null)}>
+                            Cancel
+                          </button>
+                        </form>
+                      ) : (
+                        g.name
+                      )}
+                    </td>
                     <td>{toggle("USB storage", c.usb_storage_blocked, (v) => ({ usb_storage_blocked: v }))}</td>
                     <td>{toggle("Network", c.network_blocked, (v) => ({ network_blocked: v }))}</td>
                     <td>{toggle("Elevation", c.elevation_blocked, (v) => ({ elevation_blocked: v }))}</td>
                     <td className="mono">{g.id}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <button className="ghost" onClick={() => setEditing({ id: g.id, name: g.name })}>
+                        Rename
+                      </button>
+                      <button className="ghost" onClick={() => setDeleting(g)}>
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
+      )}
+      {deleting && (
+        <Confirm
+          title={`Delete group “${deleting.name}”?`}
+          confirmLabel="Delete"
+          danger
+          busy={busy}
+          onConfirm={remove}
+          onCancel={() => setDeleting(null)}
+        >
+          <p>
+            Its devices and install tokens become ungrouped. Those devices lose this group's policy
+            assignments and device controls.
+          </p>
+        </Confirm>
       )}
     </div>
   );

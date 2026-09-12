@@ -11,6 +11,7 @@ export function Alerts() {
   const [metric, setMetric] = useState<"cpu" | "mem" | "disk">("cpu");
   const [op, setOp] = useState<"gt" | "lt">("gt");
   const [threshold, setThreshold] = useState("90");
+  const [editing, setEditing] = useState<AlertRule | null>(null);
 
   const load = () => {
     api.get<Alert[]>("/api/alerts").then(setAlerts).catch(() => setAlerts([]));
@@ -30,6 +31,17 @@ export function Alerts() {
       load();
     } catch (e) {
       notify(e instanceof ApiError ? e.message : "Could not create rule", "error");
+    }
+  };
+
+  const update = async (r: AlertRule) => {
+    try {
+      const { id, ...body } = r;
+      await api.patch(`/api/alert-rules/${id}`, body);
+      setEditing(null);
+      load();
+    } catch (e) {
+      notify(e instanceof ApiError ? e.message : "Could not update rule", "error");
     }
   };
 
@@ -84,19 +96,64 @@ export function Alerts() {
           <div className="table-wrap" style={{ border: "none", marginTop: 8 }}>
             <table>
               <tbody>
-                {rules.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.name}</td>
-                    <td className="mono">
-                      {r.metric} {r.op === "gt" ? ">" : "<"} {r.threshold}%
-                    </td>
-                    <td>
-                      <button className="ghost" onClick={() => del(r.id)}>
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {rules.map((r) =>
+                  editing?.id === r.id ? (
+                    <tr key={r.id}>
+                      <td>
+                        <input aria-label="Rule name" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+                      </td>
+                      <td className="mono" style={{ whiteSpace: "nowrap" }}>
+                        {r.metric} {r.op === "gt" ? ">" : "<"}{" "}
+                        <input
+                          aria-label="Threshold"
+                          style={{ width: 60 }}
+                          value={editing.threshold}
+                          onChange={(e) => setEditing({ ...editing, threshold: Number(e.target.value.replace(/\D/g, "")) })}
+                        />
+                        % for{" "}
+                        <input
+                          aria-label="Duration seconds"
+                          style={{ width: 60 }}
+                          value={editing.duration_seconds}
+                          onChange={(e) => setEditing({ ...editing, duration_seconds: Number(e.target.value.replace(/\D/g, "")) })}
+                        />
+                        s
+                      </td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <button className="primary" disabled={!editing.name.trim()} onClick={() => update(editing)}>
+                          Save
+                        </button>
+                        <button className="ghost" onClick={() => setEditing(null)}>
+                          Cancel
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={r.id}>
+                      <td>{r.name}</td>
+                      <td className="mono">
+                        {r.metric} {r.op === "gt" ? ">" : "<"} {r.threshold}%
+                        {r.duration_seconds > 0 && ` for ${r.duration_seconds}s`}
+                      </td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <select
+                          aria-label={`Rule ${r.name} state`}
+                          value={r.enabled ? "on" : "off"}
+                          onChange={(e) => update({ ...r, enabled: e.target.value === "on" })}
+                        >
+                          <option value="on">Enabled</option>
+                          <option value="off">Disabled</option>
+                        </select>
+                        <button className="ghost" onClick={() => setEditing(r)}>
+                          Edit
+                        </button>
+                        <button className="ghost" onClick={() => del(r.id)}>
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                )}
               </tbody>
             </table>
           </div>

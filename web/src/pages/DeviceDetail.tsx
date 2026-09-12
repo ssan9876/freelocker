@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, ApiError, Command, DeviceDetail as Detail, MetricSample, Observation, Policy } from "../api";
+import { api, ApiError, Command, DeviceDetail as Detail, Group, MetricSample, Observation, Policy } from "../api";
 import { StatusDot } from "../components/StatusDot";
 import { Confirm } from "../components/Confirm";
 import { Sparkline } from "../components/Sparkline";
@@ -29,6 +29,7 @@ export function DeviceDetail() {
   const [obs, setObs] = useState<Observation[]>([]);
   const [samples, setSamples] = useState<MetricSample[]>([]);
   const [policies, setPolicies] = useState<Policy[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [promoteTo, setPromoteTo] = useState("");
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -42,7 +43,18 @@ export function DeviceDetail() {
 
   useEffect(() => {
     api.get<Policy[]>("/api/policies").then(setPolicies).catch(() => {});
+    api.get<Group[]>("/api/groups").then(setGroups).catch(() => {});
   }, []);
+
+  const moveToGroup = async (groupId: string) => {
+    try {
+      await api.post(`/api/devices/${id}/group`, { group_id: groupId || null });
+      notify(groupId ? "Moved to group" : "Removed from group");
+      load();
+    } catch (e) {
+      notify(e instanceof ApiError ? e.message : "Could not move device", "error");
+    }
+  };
 
   const promote = async (sha256: string, description: string) => {
     if (!promoteTo) {
@@ -111,6 +123,17 @@ export function DeviceDetail() {
             <dd>{d.id}</dd>
             <dt>Hostname</dt>
             <dd>{d.hostname}</dd>
+            <dt>Group</dt>
+            <dd>
+              <select aria-label="Group" value={d.group_id ?? ""} onChange={(e) => moveToGroup(e.target.value)}>
+                <option value="">No group</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </dd>
             <dt>OS build</dt>
             <dd>{d.os_build || "—"}</dd>
             <dt>Agent version</dt>

@@ -30,13 +30,13 @@ export function Admins() {
     }
   };
 
-  const disable = async (id: string) => {
+  const act = async (path: string, body: unknown, done: string) => {
     try {
-      await api.post(`/api/admins/${id}/disable`);
-      notify("Admin disabled");
+      await api.post(path, body);
+      notify(done);
       load();
     } catch (e) {
-      notify(e instanceof ApiError ? e.message : "Could not disable", "error");
+      notify(e instanceof ApiError ? e.message : "Could not update admin", "error");
     }
   };
 
@@ -91,17 +91,34 @@ export function Admins() {
                 <tr key={a.id}>
                   <td>{a.email}</td>
                   <td>
-                    <span className="badge role">{a.role}</span>
+                    {a.id === me?.id ? (
+                      <span className="badge role">{a.role}</span>
+                    ) : (
+                      <select
+                        aria-label={`Role for ${a.email}`}
+                        value={a.role}
+                        onChange={(e) => act(`/api/admins/${a.id}/role`, { role: e.target.value }, "Role updated")}
+                      >
+                        <option value="readonly">Read-only</option>
+                        <option value="admin">Admin</option>
+                        <option value="owner">Owner</option>
+                      </select>
+                    )}
                   </td>
                   <td>{a.mfa_enrolled ? "Enrolled" : "—"}</td>
                   <td>{a.disabled ? <span className="badge fail">Disabled</span> : <span className="badge ok">Active</span>}</td>
                   <td>{fmtDate(a.created_at)}</td>
                   <td>
-                    {!a.disabled && a.id !== me?.id && (
-                      <button className="ghost" onClick={() => disable(a.id)}>
-                        Disable
-                      </button>
-                    )}
+                    {a.id !== me?.id &&
+                      (a.disabled ? (
+                        <button className="ghost" onClick={() => act(`/api/admins/${a.id}/enable`, undefined, "Admin enabled")}>
+                          Enable
+                        </button>
+                      ) : (
+                        <button className="ghost" onClick={() => act(`/api/admins/${a.id}/disable`, undefined, "Admin disabled")}>
+                          Disable
+                        </button>
+                      ))}
                   </td>
                 </tr>
               ))}
