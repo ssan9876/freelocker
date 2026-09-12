@@ -91,7 +91,12 @@ export function Groups() {
           <div className="toolbar" style={{ alignItems: "flex-end" }}>
             <div>
               <label>New group name</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Workstations" />
+              <input
+                aria-label="New group name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Workstations"
+              />
             </div>
             <button className="primary" disabled={!name}>
               Add group

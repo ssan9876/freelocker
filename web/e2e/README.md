@@ -1,9 +1,19 @@
 # Console E2E (Playwright)
 
 Drives the real console served by the Go server against a fresh database —
-no mocks. The one smoke test covers first-run setup → sign in → the MFA
-enrollment screen (stopping before the TOTP code, which the server's Go
-tests cover).
+no mocks.
+
+- `smoke.spec.ts`: first-run setup → sign in → **MFA enrollment and
+  verification** → the console, then group create/rename/delete, alert-rule
+  create/edit/disable, and admin add/role-change/disable/enable. The
+  enrollment screen shows the setup key, so the test reads it and computes the
+  6-digit code itself (`totp.ts`) — no seeded secret or test-only endpoint.
+- `totp.spec.ts`: checks that helper against the RFC 6238 test vector, so a
+  broken code generator fails here rather than looking like a console bug.
+
+Device-scoped screens (device controls, observed applications and their
+publisher column) need an enrolled agent reporting data, so they stay in the
+Go tests.
 
 ## Run locally
 1. Start the dev Postgres: `docker compose -f ../deploy/docker-compose.dev.yml up -d`.

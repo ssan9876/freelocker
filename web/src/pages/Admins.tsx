@@ -51,15 +51,21 @@ export function Admins() {
           <div className="toolbar" style={{ alignItems: "flex-end" }}>
             <div>
               <label>Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input aria-label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div>
               <label>Temporary password</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="12+ characters" />
+              <input
+                aria-label="Temporary password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="12+ characters"
+              />
             </div>
             <div>
               <label>Role</label>
-              <select value={role} onChange={(e) => setRole(e.target.value)}>
+              <select aria-label="Role" value={role} onChange={(e) => setRole(e.target.value)}>
                 <option value="readonly">Read-only</option>
                 <option value="admin">Admin</option>
                 <option value="owner">Owner</option>

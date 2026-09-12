@@ -66,11 +66,11 @@ export function Alerts() {
           <div className="toolbar" style={{ alignItems: "flex-end" }}>
             <div>
               <label>Name</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="High CPU" />
+              <input aria-label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="High CPU" />
             </div>
             <div>
               <label>Metric</label>
-              <select value={metric} onChange={(e) => setMetric(e.target.value as typeof metric)}>
+              <select aria-label="Metric" value={metric} onChange={(e) => setMetric(e.target.value as typeof metric)}>
                 <option value="cpu">CPU</option>
                 <option value="mem">Memory</option>
                 <option value="disk">Disk</option>
@@ -78,14 +78,18 @@ export function Alerts() {
             </div>
             <div>
               <label>Condition</label>
-              <select value={op} onChange={(e) => setOp(e.target.value as typeof op)}>
+              <select aria-label="Condition" value={op} onChange={(e) => setOp(e.target.value as typeof op)}>
                 <option value="gt">above</option>
                 <option value="lt">below</option>
               </select>
             </div>
             <div>
               <label>Threshold %</label>
-              <input value={threshold} onChange={(e) => setThreshold(e.target.value.replace(/\D/g, ""))} />
+              <input
+                aria-label="Threshold %"
+                value={threshold}
+                onChange={(e) => setThreshold(e.target.value.replace(/\D/g, ""))}
+              />
             </div>
             <button className="primary" disabled={!name}>
               Add rule
