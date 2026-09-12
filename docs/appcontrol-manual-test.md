@@ -33,7 +33,42 @@ Windows 11 / Server 2022+ (has `CiTool.exe`).
 - On the VM directly: delete `C:\ProgramData\FreeLocker\allow-enforce`, then remove the active policy with `CiTool --remove-policy {A244370E-44C9-4C06-B551-F6016E563076}` and reboot. WDAC base policies take effect/clear on reboot.
 - Worst case: boot into recovery and delete `C:\Windows\System32\CodeIntegrity\CiPolicies\Active\*.cip`, then reboot.
 
+## Publisher rules (the point: a rule that survives app updates)
+
+A hash rule breaks the moment an application updates. A publisher rule allows
+anything signed by the same code-signing certificate, so it keeps working.
+
+1. **Run a signed third-party app** on the VM (something not covered by the
+   Microsoft baseline — a portable tool signed by its vendor is ideal).
+2. On the device page, under *Observed applications*, check the **Publisher**
+   column. A signature Windows trusts shows the publisher's name; one it
+   cannot verify shows "(unverified)", and an unsigned or catalog-signed file
+   shows "—". Many Microsoft binaries are catalog-signed and show "—"; they
+   are already allowed by the baseline, so that is expected.
+3. **Allow the publisher:** pick the policy, then *Add as publisher*. The
+   button is disabled unless Windows verified the signature — deliberately, so
+   a forged or tampered signature can never become a rule.
+4. On the policy page the new rule's kind is `publisher` and its value is a
+   64-character certificate hash (**not** the file's hash), with the
+   publisher's name beside it.
+5. **Prove it survives an update:** run a *different* build signed by the same
+   publisher (a newer version, or another tool from the same vendor). In audit
+   mode it produces no "would block"; in enforce mode it launches. Its file
+   hash was never allowed — only its publisher.
+6. **Prove it is still a real restriction:** in enforce mode, an unsigned copy
+   of the same program (edit a byte of the file to break its signature) is
+   still blocked.
+7. **Approvals path:** in audit mode, let a blocked signed app raise an
+   approval request, then use *Approve publisher* on the Approvals page. Same
+   verified-only rule applies, and the audit log records
+   `approval.approve` with `kind: publisher`.
+
+Note: a publisher whose certificate uses the older SHA-1 signing algorithm
+cannot become a rule (WDAC needs the longer modern identifier); the console
+shows the publisher but the rule is refused. Allow those by hash.
+
 ## What automated tests already cover (so this doc stays short)
 - Rule validation/normalization, deterministic WDAC XML + versioning, the Microsoft baseline in every policy, policy store/versioning/assignment, recompiling all policies at server startup, effective-policy resolution and signing, the GetPolicy/Observe/ReportBlocks RPCs, the console policy API, the enforcer interface, Authenticode file hashing, CodeIntegrity XML parsing, and the full agent app-control loop (with a test enforcer).
+- **Publisher identity:** `internal/appcontrol/signature` tests cover PE/PKCS#7 parsing, the TBS hash (including that it follows the certificate's own hash algorithm), picking the code-signing certificate rather than the embedded timestamp responder, and unsigned/malformed files. A Windows-only test verifies a real signed system binary through `WinVerifyTrust`. Server tests cover promote/approve-as-publisher, including that an unverified publisher is refused and that the certificate hash is always read server-side, never taken from the client.
 - **Windows accepts the XML:** a Windows-only test (`internal/appcontrol/wdac/wdac_windows_test.go`) converts empty, hash, path, publisher and mixed policies in both modes with `ConvertFrom-CIPolicy` on any Windows dev box. It only writes a `.cip` to a temp dir; nothing is deployed.
 - **Not** covered here: that `CiTool` activates the policy and CodeIntegrity enforces it as expected — that is exactly what steps 4–5 above verify.
