@@ -81,7 +81,16 @@ then `go test ./...`. The web console builds with `npm --prefix web run build`.
 - `cmd/` — `server`, `agent`, `agent-updater`, `agent-sim` (load/test tool)
 - `internal/server/` — store, CA, auth, gRPC agent API, REST API, app wiring
 - `internal/agent/` — identity, runner, enforcer, controls, metrics, scan, service
-- `internal/appcontrol/` — rule model + WDAC compiler
+- `internal/appcontrol/` — rule model, WDAC compiler, Authenticode signature reader
 - `web/` — React + TypeScript console
 - `proto/` — gRPC/protobuf; `deploy/` — Docker + MSI
 - `docs/` — specs, plans, and manual-test checklists
+
+## Licence
+
+Apache License 2.0 — see [LICENSE](LICENSE). You may use, modify and
+distribute this, including commercially, provided you keep the notices; it
+comes with no warranty of any kind.
+
+FreeLocker changes how Windows decides what may run and what hardware may be
+used. Test it on a disposable VM before any machine you care about.
