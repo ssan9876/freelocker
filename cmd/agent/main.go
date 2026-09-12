@@ -101,6 +101,7 @@ func runAgent(log *slog.Logger) error {
 			return st.Renew(ctx, cfg.ServerURL, l)
 		},
 		Uninstaller: uninstaller(paths),
+		Refresh:     r.RequestHeartbeat,
 	}
 	r.Executor = &executor.Executor{Actions: act, Log: log}
 	r.Enforcer = enforcer.Default(paths.DataDir)

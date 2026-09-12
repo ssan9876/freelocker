@@ -6,6 +6,7 @@ import (
 	"context"
 	"log/slog"
 	"math/rand/v2"
+	"sync"
 	"time"
 
 	"crypto/ed25519"
@@ -59,6 +60,24 @@ type Runner struct {
 	// Events (optional). When set, the runner reports device events
 	// (process launches, logons) on the metrics ticker.
 	Events events.Reader
+
+	refreshOnce sync.Once
+	refresh     chan struct{}
+}
+
+func (r *Runner) refreshCh() chan struct{} {
+	r.refreshOnce.Do(func() { r.refresh = make(chan struct{}, 1) })
+	return r.refresh
+}
+
+// RequestHeartbeat asks the current session to send a heartbeat (with fresh
+// inventory) now rather than at the next interval. Requests made while one is
+// already pending coalesce; it never blocks.
+func (r *Runner) RequestHeartbeat() {
+	select {
+	case r.refreshCh() <- struct{}{}:
+	default:
+	}
 }
 
 func HardwareInfo(c inventory.Collector) *flv1.HardwareInfo {
@@ -172,6 +191,10 @@ func (r *Runner) session(ctx context.Context, connected func()) error {
 		case err := <-recvErr:
 			return err
 		case <-tick.C:
+			if err := r.heartbeat(stream); err != nil {
+				return err
+			}
+		case <-r.refreshCh():
 			if err := r.heartbeat(stream); err != nil {
 				return err
 			}

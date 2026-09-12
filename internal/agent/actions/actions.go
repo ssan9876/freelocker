@@ -30,6 +30,9 @@ type Actions struct {
 	// Uninstaller performs stop+delete+cleanup (Windows implementation
 	// injected by the service; nil elsewhere).
 	Uninstaller func(ctx context.Context) error
+	// Refresh asks the runner for an immediate heartbeat (fresh inventory);
+	// injected by the service as runner.RequestHeartbeat.
+	Refresh func()
 
 	// StageOnly stops UpdateAgent before launching the swap helper (tests).
 	StageOnly bool
@@ -42,7 +45,15 @@ func (a *Actions) log() *slog.Logger {
 	return slog.Default()
 }
 
-func (a *Actions) RefreshInventory(ctx context.Context) error { return nil }
+// RefreshInventory queues an immediate heartbeat; the fresh inventory reaches
+// the server on the live session moments after the command completes.
+func (a *Actions) RefreshInventory(ctx context.Context) error {
+	if a.Refresh == nil {
+		return errors.New("refresh not wired")
+	}
+	a.Refresh()
+	return nil
+}
 
 func (a *Actions) RotateCertificate(ctx context.Context) error {
 	if a.Renew == nil {

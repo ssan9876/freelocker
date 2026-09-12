@@ -36,6 +36,17 @@ func TestUpdateAgentRejectsBadSignature(t *testing.T) {
 	}
 }
 
+func TestRefreshInventoryRequestsHeartbeat(t *testing.T) {
+	if err := (&Actions{}).RefreshInventory(context.Background()); err == nil {
+		t.Fatal("RefreshInventory without a Refresh hook must fail, not report success")
+	}
+	calls := 0
+	a := &Actions{Refresh: func() { calls++ }}
+	if err := a.RefreshInventory(context.Background()); err != nil || calls != 1 {
+		t.Fatalf("RefreshInventory = %v, calls = %d", err, calls)
+	}
+}
+
 func TestUpdateAgentAcceptsGoodSignatureStageOnly(t *testing.T) {
 	payload := []byte("agent-bytes-2")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write(payload) }))
