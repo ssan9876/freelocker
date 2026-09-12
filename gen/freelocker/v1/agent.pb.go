@@ -481,12 +481,14 @@ func (x *GetPolicyResponse) GetSignature() []byte {
 
 // ObservedApp is a running/seen executable reported during learning mode.
 type ObservedApp struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Sha256        string                 `protobuf:"bytes,1,opt,name=sha256,proto3" json:"sha256,omitempty"`
-	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	Signer        string                 `protobuf:"bytes,3,opt,name=signer,proto3" json:"signer,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Sha256         string                 `protobuf:"bytes,1,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	Path           string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Signer         string                 `protobuf:"bytes,3,opt,name=signer,proto3" json:"signer,omitempty"`
+	SignerTbs      string                 `protobuf:"bytes,4,opt,name=signer_tbs,json=signerTbs,proto3" json:"signer_tbs,omitempty"`                 // signing certificate TBS hash, "" when unsigned
+	SignerVerified bool                   `protobuf:"varint,5,opt,name=signer_verified,json=signerVerified,proto3" json:"signer_verified,omitempty"` // Windows verified the signature
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ObservedApp) Reset() {
@@ -540,6 +542,20 @@ func (x *ObservedApp) GetSigner() string {
 	return ""
 }
 
+func (x *ObservedApp) GetSignerTbs() string {
+	if x != nil {
+		return x.SignerTbs
+	}
+	return ""
+}
+
+func (x *ObservedApp) GetSignerVerified() bool {
+	if x != nil {
+		return x.SignerVerified
+	}
+	return false
+}
+
 type ObserveRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Apps          []*ObservedApp         `protobuf:"bytes,1,rep,name=apps,proto3" json:"apps,omitempty"`
@@ -585,14 +601,16 @@ func (x *ObserveRequest) GetApps() []*ObservedApp {
 }
 
 type BlockEvent struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Sha256        string                 `protobuf:"bytes,1,opt,name=sha256,proto3" json:"sha256,omitempty"`
-	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
-	Signer        string                 `protobuf:"bytes,3,opt,name=signer,proto3" json:"signer,omitempty"`
-	Blocked       bool                   `protobuf:"varint,4,opt,name=blocked,proto3" json:"blocked,omitempty"` // true = enforced block, false = audit-only would-block
-	AtUnix        int64                  `protobuf:"varint,5,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Sha256         string                 `protobuf:"bytes,1,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	Path           string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Signer         string                 `protobuf:"bytes,3,opt,name=signer,proto3" json:"signer,omitempty"`
+	Blocked        bool                   `protobuf:"varint,4,opt,name=blocked,proto3" json:"blocked,omitempty"` // true = enforced block, false = audit-only would-block
+	AtUnix         int64                  `protobuf:"varint,5,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
+	SignerTbs      string                 `protobuf:"bytes,6,opt,name=signer_tbs,json=signerTbs,proto3" json:"signer_tbs,omitempty"`
+	SignerVerified bool                   `protobuf:"varint,7,opt,name=signer_verified,json=signerVerified,proto3" json:"signer_verified,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *BlockEvent) Reset() {
@@ -658,6 +676,20 @@ func (x *BlockEvent) GetAtUnix() int64 {
 		return x.AtUnix
 	}
 	return 0
+}
+
+func (x *BlockEvent) GetSignerTbs() string {
+	if x != nil {
+		return x.SignerTbs
+	}
+	return ""
+}
+
+func (x *BlockEvent) GetSignerVerified() bool {
+	if x != nil {
+		return x.SignerVerified
+	}
+	return false
 }
 
 type ReportBlocksRequest struct {
@@ -1574,20 +1606,26 @@ const file_freelocker_v1_agent_proto_rawDesc = "" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x12\n" +
 	"\x04mode\x18\x02 \x01(\tR\x04mode\x12\x10\n" +
 	"\x03xml\x18\x03 \x01(\fR\x03xml\x12\x1c\n" +
-	"\tsignature\x18\x04 \x01(\fR\tsignature\"Q\n" +
+	"\tsignature\x18\x04 \x01(\fR\tsignature\"\x99\x01\n" +
 	"\vObservedApp\x12\x16\n" +
 	"\x06sha256\x18\x01 \x01(\tR\x06sha256\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x16\n" +
-	"\x06signer\x18\x03 \x01(\tR\x06signer\"@\n" +
+	"\x06signer\x18\x03 \x01(\tR\x06signer\x12\x1d\n" +
+	"\n" +
+	"signer_tbs\x18\x04 \x01(\tR\tsignerTbs\x12'\n" +
+	"\x0fsigner_verified\x18\x05 \x01(\bR\x0esignerVerified\"@\n" +
 	"\x0eObserveRequest\x12.\n" +
-	"\x04apps\x18\x01 \x03(\v2\x1a.freelocker.v1.ObservedAppR\x04apps\"\x83\x01\n" +
+	"\x04apps\x18\x01 \x03(\v2\x1a.freelocker.v1.ObservedAppR\x04apps\"\xcb\x01\n" +
 	"\n" +
 	"BlockEvent\x12\x16\n" +
 	"\x06sha256\x18\x01 \x01(\tR\x06sha256\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x16\n" +
 	"\x06signer\x18\x03 \x01(\tR\x06signer\x12\x18\n" +
 	"\ablocked\x18\x04 \x01(\bR\ablocked\x12\x17\n" +
-	"\aat_unix\x18\x05 \x01(\x03R\x06atUnix\"H\n" +
+	"\aat_unix\x18\x05 \x01(\x03R\x06atUnix\x12\x1d\n" +
+	"\n" +
+	"signer_tbs\x18\x06 \x01(\tR\tsignerTbs\x12'\n" +
+	"\x0fsigner_verified\x18\a \x01(\bR\x0esignerVerified\"H\n" +
 	"\x13ReportBlocksRequest\x121\n" +
 	"\x06events\x18\x01 \x03(\v2\x19.freelocker.v1.BlockEventR\x06events\"h\n" +
 	"\fHardwareInfo\x12\x1a\n" +

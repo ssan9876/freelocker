@@ -5,12 +5,15 @@ package scan
 import (
 	"unsafe"
 
+	"freelocker/internal/appcontrol/signature"
+
 	"golang.org/x/sys/windows"
 )
 
 // runningImpl enumerates running processes, resolves each full image path,
-// and hashes the distinct executables. Signer resolution is deferred
-// (verified on a VM); Signer is left empty for now.
+// and records the Authenticode hash plus the publisher identity of each
+// distinct executable. Publisher lookup is best effort: a file we cannot
+// parse is still reported, just without a publisher.
 func runningImpl() ([]Observed, error) {
 	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
@@ -31,7 +34,11 @@ func runningImpl() ([]Observed, error) {
 			if _, dup := seen[path]; !dup {
 				seen[path] = struct{}{}
 				if sum, err := AuthenticodeHash(path); err == nil {
-					out = append(out, Observed{SHA256: sum, Path: path})
+					o := Observed{SHA256: sum, Path: path}
+					if info, err := signature.FromFile(path); err == nil {
+						o.Signer, o.SignerTBS, o.SignerVerified = info.SubjectName, info.TBSHash, info.Verified
+					}
+					out = append(out, o)
 				}
 			}
 		}

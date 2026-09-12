@@ -16,6 +16,12 @@ type BlockEvent struct {
 	Signer  string
 	Blocked bool // true = enforced (3077); false = audit would-block (3076)
 	At      time.Time
+
+	// The CodeIntegrity log carries only a publisher name; these are filled
+	// from the file on disk (see runner.EnrichBlockEvents), because WDAC
+	// publisher rules need the certificate's TBS hash.
+	SignerTBS      string
+	SignerVerified bool
 }
 
 // wevtutil renders a sequence of <Event> elements (not wrapped in a root),

@@ -61,6 +61,8 @@ message ObservedApp {
   string sha256 = 1;
   string path = 2;
   string signer = 3;
+  string signer_tbs = 4;      // signing certificate TBS hash, "" when unsigned
+  bool signer_verified = 5;   // Windows verified the signature
 }
 
 message ObserveRequest {
@@ -73,6 +75,8 @@ message BlockEvent {
   string signer = 3;
   bool blocked = 4; // true = enforced block, false = audit-only would-block
   int64 at_unix = 5;
+  string signer_tbs = 6;
+  bool signer_verified = 7;
 }
 
 message ReportBlocksRequest {

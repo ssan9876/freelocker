@@ -9,22 +9,26 @@ import (
 )
 
 type Observation struct {
-	SHA256    string
-	Path      string
-	Signer    string
-	FirstSeen time.Time
-	LastSeen  time.Time
-	Count     int64
+	SHA256         string
+	Path           string
+	Signer         string
+	SignerTBS      string
+	SignerVerified bool
+	FirstSeen      time.Time
+	LastSeen       time.Time
+	Count          int64
 }
 
 type BlockEvent struct {
-	ID       int64
-	DeviceID uuid.UUID
-	SHA256   string
-	Path     string
-	Signer   string
-	Blocked  bool
-	At       time.Time
+	ID             int64
+	DeviceID       uuid.UUID
+	SHA256         string
+	Path           string
+	Signer         string
+	SignerTBS      string
+	SignerVerified bool
+	Blocked        bool
+	At             time.Time
 }
 
 // RecordObservation upserts a learning observation, incrementing the count

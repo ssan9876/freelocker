@@ -12,6 +12,7 @@ import (
 	"crypto/ed25519"
 
 	flv1 "freelocker/gen/freelocker/v1"
+	"freelocker/internal/agent/blocks"
 	"freelocker/internal/agent/controls"
 	"freelocker/internal/agent/enforcer"
 	"freelocker/internal/agent/events"
@@ -20,6 +21,7 @@ import (
 	"freelocker/internal/agent/inventory"
 	"freelocker/internal/agent/metrics"
 	"freelocker/internal/agent/scan"
+	"freelocker/internal/appcontrol/signature"
 	"freelocker/internal/server/ca"
 	"freelocker/internal/server/commands"
 	"freelocker/internal/sim"
@@ -298,7 +300,8 @@ func (r *Runner) reportObservations(ctx context.Context, client flv1.AgentClient
 	}
 	apps := make([]*flv1.ObservedApp, 0, len(obs))
 	for _, o := range obs {
-		apps = append(apps, &flv1.ObservedApp{Sha256: o.SHA256, Path: o.Path, Signer: o.Signer})
+		apps = append(apps, &flv1.ObservedApp{Sha256: o.SHA256, Path: o.Path, Signer: o.Signer,
+			SignerTbs: o.SignerTBS, SignerVerified: o.SignerVerified})
 	}
 	if _, err := client.Observe(ctx, &flv1.ObserveRequest{Apps: apps}); err != nil {
 		r.log().Warn("report observations", "err", err)
@@ -351,15 +354,38 @@ func (r *Runner) reportEvents(ctx context.Context, client flv1.AgentClient) {
 	}
 }
 
+// EnrichBlockEvents fills in publisher identity from each event's file on
+// disk: the CodeIntegrity log carries only a name, and WDAC publisher rules
+// need the certificate's TBS hash. Missing or unsigned files are left as they
+// are, so an event is never dropped for lack of a signature.
+func EnrichBlockEvents(evs []blocks.BlockEvent) []blocks.BlockEvent {
+	for i := range evs {
+		if evs[i].Path == "" || evs[i].SignerTBS != "" {
+			continue
+		}
+		info, err := signature.FromFile(evs[i].Path)
+		if err != nil {
+			continue
+		}
+		evs[i].SignerTBS, evs[i].SignerVerified = info.TBSHash, info.Verified
+		if evs[i].Signer == "" {
+			evs[i].Signer = info.SubjectName
+		}
+	}
+	return evs
+}
+
 func (r *Runner) reportBlocks(ctx context.Context, client flv1.AgentClient) {
 	events, err := r.Enforcer.Events(ctx)
 	if err != nil || len(events) == 0 {
 		return
 	}
+	events = EnrichBlockEvents(events)
 	out := make([]*flv1.BlockEvent, 0, len(events))
 	for _, e := range events {
 		out = append(out, &flv1.BlockEvent{
 			Sha256: e.SHA256, Path: e.Path, Signer: e.Signer, Blocked: e.Blocked, AtUnix: e.At.Unix(),
+			SignerTbs: e.SignerTBS, SignerVerified: e.SignerVerified,
 		})
 	}
 	if _, err := client.ReportBlocks(ctx, &flv1.ReportBlocksRequest{Events: out}); err != nil {

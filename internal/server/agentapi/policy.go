@@ -35,6 +35,7 @@ func (s *agentService) Observe(ctx context.Context, req *flv1.ObserveRequest) (*
 		}
 		err := s.d.Store.RecordObservation(ctx, dev.TenantID, dev.ID, store.Observation{
 			SHA256: a.GetSha256(), Path: a.GetPath(), Signer: a.GetSigner(),
+			SignerTBS: a.GetSignerTbs(), SignerVerified: a.GetSignerVerified(),
 		}, now)
 		if err != nil {
 			s.d.Log.Error("record observation", "device", dev.ID, "err", err)
@@ -54,6 +55,7 @@ func (s *agentService) ReportBlocks(ctx context.Context, req *flv1.ReportBlocksR
 		}
 		events = append(events, store.BlockEvent{
 			SHA256: e.GetSha256(), Path: e.GetPath(), Signer: e.GetSigner(), Blocked: e.GetBlocked(), At: at,
+			SignerTBS: e.GetSignerTbs(), SignerVerified: e.GetSignerVerified(),
 		})
 	}
 	if err := s.d.Store.RecordBlockEvents(ctx, dev.TenantID, dev.ID, events); err != nil {

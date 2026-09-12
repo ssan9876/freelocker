@@ -14,9 +14,11 @@ import (
 )
 
 type Observed struct {
-	SHA256 string
-	Path   string
-	Signer string
+	SHA256         string
+	Path           string
+	Signer         string // friendly publisher name
+	SignerTBS      string // signing certificate TBS hash, "" when unsigned
+	SignerVerified bool   // Windows verified the signature
 }
 
 // HashFile returns the upper-case hex SHA-256 of a file's contents.
