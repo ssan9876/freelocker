@@ -48,6 +48,9 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 
 func (s *Store) Close() { s.pool.Close() }
 
+// Ping checks database connectivity (used by the readiness probe).
+func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
+
 func (s *Store) Migrate(ctx context.Context) error {
 	fsys, err := fs.Sub(migrations, "migrations")
 	if err != nil {

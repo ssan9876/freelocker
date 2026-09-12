@@ -51,6 +51,8 @@ func (a *API) Handler() http.Handler {
 	}
 	a.limiter = newLoginLimiter(a.Store)
 	r := chi.NewRouter()
+	r.Get("/healthz", a.health)
+	r.Get("/readyz", a.ready)
 	r.Get("/api/setup/status", a.setupStatus)
 	r.Post("/api/setup", a.setup)
 	r.Get("/agent/releases/{version}", a.downloadRelease)

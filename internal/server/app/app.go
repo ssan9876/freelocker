@@ -29,6 +29,7 @@ import (
 	"freelocker/internal/server/webui"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/acme/autocert"
 	"google.golang.org/grpc"
 )
 
@@ -275,19 +276,36 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	httpSrv := &http.Server{Addr: a.cfg.ConsoleListen, Handler: a.handler, ReadHeaderTimeout: 10 * time.Second}
+	mode := a.cfg.ConsoleTLSMode()
 	errc := make(chan error, 1)
 	go func() {
 		var err error
-		if a.cfg.ConsoleTLSCert != "" {
+		switch mode {
+		case "acme":
+			m := &autocert.Manager{
+				Prompt:     autocert.AcceptTOS,
+				HostPolicy: autocert.HostWhitelist(a.cfg.ACMEDomains...),
+				Cache:      autocert.DirCache(a.cfg.ACMECacheDir),
+				Email:      a.cfg.ACMEEmail,
+			}
+			httpSrv.TLSConfig = m.TLSConfig()
+			// Serve the HTTP-01 challenge (and redirect http→https) on :80.
+			go func() {
+				if err := http.ListenAndServe(":80", m.HTTPHandler(nil)); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					a.log.Error("ACME HTTP challenge listener", "err", err)
+				}
+			}()
+			err = httpSrv.ListenAndServeTLS("", "")
+		case "file":
 			err = httpSrv.ListenAndServeTLS(a.cfg.ConsoleTLSCert, a.cfg.ConsoleTLSKey)
-		} else {
+		default:
 			err = httpSrv.ListenAndServe()
 		}
 		if !errors.Is(err, http.ErrServerClosed) {
 			errc <- err
 		}
 	}()
-	a.log.Info("console API listening", "addr", a.cfg.ConsoleListen, "tls", a.cfg.ConsoleTLSCert != "")
+	a.log.Info("console API listening", "addr", a.cfg.ConsoleListen, "tls_mode", mode)
 
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()

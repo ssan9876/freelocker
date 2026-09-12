@@ -8,3 +8,9 @@ master_secret_file: master.key # created on first run; back it up, keep it out o
 console_tls_cert: ""           # optional PEM cert/key for the console; leave empty behind a TLS proxy
 console_tls_key: ""
 insecure_cookies: false        # true only for plain-HTTP access to a non-localhost address (testing)
+# Let's Encrypt for the console (takes precedence over console_tls_cert).
+# Needs the domain to resolve to this host and ports 443 (console_listen)
+# and 80 (ACME HTTP-01 challenge) reachable from the internet.
+acme_domains: []               # e.g. [console.example.com]
+acme_email: ""                 # ACME account contact
+acme_cache_dir: acme-cache     # where issued certificates are cached

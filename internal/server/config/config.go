@@ -21,6 +21,23 @@ type Config struct {
 	ConsoleTLSKey    string   `yaml:"console_tls_key"`
 	InsecureCookies  bool     `yaml:"insecure_cookies"`
 	ReleaseDir       string   `yaml:"release_dir"`
+	ACMEDomains      []string `yaml:"acme_domains"`    // enable Let's Encrypt for the console on these domains
+	ACMEEmail        string   `yaml:"acme_email"`      // contact email for the ACME account
+	ACMECacheDir     string   `yaml:"acme_cache_dir"`  // where issued certs are cached
+}
+
+// ConsoleTLSMode reports how the console listener obtains TLS:
+// "acme" (Let's Encrypt), "file" (cert+key), or "plain" (no TLS).
+// ACME takes precedence over a cert file if both are set.
+func (c Config) ConsoleTLSMode() string {
+	switch {
+	case len(c.ACMEDomains) > 0:
+		return "acme"
+	case c.ConsoleTLSCert != "":
+		return "file"
+	default:
+		return "plain"
+	}
 }
 
 func Load(path string) (Config, error) {
@@ -30,6 +47,7 @@ func Load(path string) (Config, error) {
 		PublicHostnames:  []string{"localhost"},
 		MasterSecretFile: "master.key",
 		ReleaseDir:       "releases",
+		ACMECacheDir:     "acme-cache",
 	}
 	if path != "" {
 		b, err := os.ReadFile(path)
@@ -47,6 +65,11 @@ func Load(path string) (Config, error) {
 	envStr(&c.ConsoleTLSCert, "FREELOCKER_CONSOLE_TLS_CERT")
 	envStr(&c.ConsoleTLSKey, "FREELOCKER_CONSOLE_TLS_KEY")
 	envStr(&c.ReleaseDir, "FREELOCKER_RELEASE_DIR")
+	envStr(&c.ACMEEmail, "FREELOCKER_ACME_EMAIL")
+	envStr(&c.ACMECacheDir, "FREELOCKER_ACME_CACHE_DIR")
+	if v := os.Getenv("FREELOCKER_ACME_DOMAINS"); v != "" {
+		c.ACMEDomains = strings.Split(v, ",")
+	}
 	if os.Getenv("FREELOCKER_INSECURE_COOKIES") == "true" {
 		c.InsecureCookies = true
 	}
