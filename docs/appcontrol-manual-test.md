@@ -67,6 +67,34 @@ Note: a publisher whose certificate uses the older SHA-1 signing algorithm
 cannot become a rule (WDAC needs the longer modern identifier); the console
 shows the publisher but the rule is refused. Allow those by hash.
 
+## Caveat: hash rules created before agent 0.2.0
+
+Agents before 0.2.0 reported a plain file SHA-256, but WDAC hash rules match
+the **Authenticode** hash. Migration `0007_reset_observations.sql` clears the
+affected observations, and agents repopulate them correctly.
+
+What it cannot clean up is anything already derived from them: a policy rule
+promoted from such an observation — or approved from a block event of that
+era — holds a plain hash and therefore **never matches any file**. It does not
+fail loudly; the program simply keeps being blocked (or keeps needing another
+rule). Both hash types are 64 hex characters, so nothing can tell them apart
+afterwards, which is why no migration removes them: it could not distinguish
+them from rules an admin added deliberately.
+
+This only affects a database that ran a pre-0.2.0 agent. To review candidates
+on such a deployment:
+
+```sql
+SELECT p.name AS policy, r.value, r.description, r.created_at
+FROM policy_rules r JOIN policies p ON p.id = r.policy_id
+WHERE r.kind = 'hash' AND r.created_at < '2026-09-11'
+ORDER BY r.created_at;
+```
+
+Re-add anything still needed from the device's current *Observed
+applications* list (or as a publisher rule), then delete the old rule and
+recompile the policy.
+
 ## What automated tests already cover (so this doc stays short)
 - Rule validation/normalization, deterministic WDAC XML + versioning, the Microsoft baseline in every policy, policy store/versioning/assignment, recompiling all policies at server startup, effective-policy resolution and signing, the GetPolicy/Observe/ReportBlocks RPCs, the console policy API, the enforcer interface, Authenticode file hashing, CodeIntegrity XML parsing, and the full agent app-control loop (with a test enforcer).
 - **Publisher identity:** `internal/appcontrol/signature` tests cover PE/PKCS#7 parsing, the TBS hash (including that it follows the certificate's own hash algorithm), picking the code-signing certificate rather than the embedded timestamp responder, and unsigned/malformed files. A Windows-only test verifies a real signed system binary through `WinVerifyTrust`. Server tests cover promote/approve-as-publisher, including that an unverified publisher is refused and that the certificate hash is always read server-side, never taken from the client.

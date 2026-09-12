@@ -2922,4 +2922,5 @@ git commit -m "feat(agent): add service management, self-protection, and MSI pac
 
 - `RefreshInventory` command currently no-ops (heartbeat cadence is 30 s); wire an immediate-heartbeat channel later if needed.
 - MSI config injection uses a `write-config` custom action; a fully declarative approach can replace it later.
+  - **Decided 2026-09-12: keep the custom action.** The agent's config is YAML and WiX has no declarative YAML writer, so "declarative" would mean converting the config to INI purely to suit the installer — changing the config format, `config.Load`/`config.Write`, and the docs, for no user-visible gain. The action already runs `Execute="deferred" Impersonate="no" Return="check"`, which is the correct shape for a per-machine install, and only fires when `SERVERURL` is set. Revisit only if the config format changes for its own reasons.
 - EV code-signing of the MSI and the agent binaries is out of scope here (needed before the WDAC/kernel work in later sub-projects and for production trust).
