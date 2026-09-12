@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"freelocker/internal/server/agentapi"
-	"freelocker/internal/server/bootstrap"
 	"freelocker/internal/server/alerting"
+	"freelocker/internal/server/bootstrap"
 	"freelocker/internal/server/commands"
 	"freelocker/internal/server/hub"
+	"freelocker/internal/server/keyset"
 	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/store/storetest"
@@ -41,11 +42,9 @@ func startServer(t *testing.T) *testServer {
 		t.Fatal(err)
 	}
 
-	d := newDeps(s, k)
-	tlsCfg, err := agentapi.TLSConfig(k, []string{"127.0.0.1"}, time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	kp := keyset.New(s, master)
+	d := newDeps(s, k, kp)
+	tlsCfg := agentapi.NewTenantTLS(kp, s, []string{"127.0.0.1"}, time.Now).Config()
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -56,12 +55,12 @@ func startServer(t *testing.T) *testServer {
 	return &testServer{Addr: lis.Addr().String(), Deps: d, Token: full}
 }
 
-func newDeps(s *store.Store, k *bootstrap.Keys) agentapi.Deps {
+func newDeps(s *store.Store, k *bootstrap.Keys, kp *keyset.Provider) agentapi.Deps {
 	h := hub.New()
 	return agentapi.Deps{
-		Store: s, Keys: k, Hub: h,
-		Commands: &commands.Service{Store: s, Keys: k, Hub: h},
-		Policy:   &policysvc.Service{Store: s, Keys: k},
+		Store: s, Keys: k, KeyFor: kp.For, Hub: h,
+		Commands: &commands.Service{Store: s, Keys: k, KeyFor: kp.For, Hub: h},
+		Policy:   &policysvc.Service{Store: s, Keys: k, KeyFor: kp.For},
 		Alerting: alerting.New(s),
 	}
 }

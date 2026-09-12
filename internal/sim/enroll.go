@@ -37,6 +37,7 @@ type Identity struct {
 func pinnedTLS(pin string) *tls.Config {
 	return &tls.Config{
 		MinVersion:         tls.VersionTLS13,
+		ServerName:         pin, // SNI: tell a multi-tenant server which tenant's cert to present
 		InsecureSkipVerify: true, // replaced by VerifyPeerCertificate below
 		VerifyPeerCertificate: func(raw [][]byte, _ [][]*x509.Certificate) error {
 			if len(raw) < 2 {
@@ -109,6 +110,7 @@ func (id *Identity) TLSConfig() (*tls.Config, error) {
 	roots.AddCert(caCert)
 	return &tls.Config{
 		MinVersion:   tls.VersionTLS13,
+		ServerName:   ca.PinFromCert(id.CADER), // SNI selects our tenant's server cert
 		RootCAs:      roots,
 		Certificates: []tls.Certificate{{Certificate: [][]byte{id.CertDER}, PrivateKey: key}},
 	}, nil

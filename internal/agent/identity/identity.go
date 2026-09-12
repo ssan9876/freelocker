@@ -137,6 +137,7 @@ func (l *Loaded) TLSConfig() (*tls.Config, error) {
 	roots.AddCert(caCert)
 	return &tls.Config{
 		MinVersion: tls.VersionTLS13, RootCAs: roots,
+		ServerName:   ca.PinFromCert(l.caDER), // SNI selects our tenant's server cert
 		Certificates: []tls.Certificate{{Certificate: [][]byte{l.certDER}, PrivateKey: key}},
 	}, nil
 }
@@ -195,7 +196,7 @@ func (s *Store) writeEnrollment(e *Enrollment) error {
 
 func pinnedTLS(pin string) *tls.Config {
 	return &tls.Config{
-		MinVersion: tls.VersionTLS13, InsecureSkipVerify: true,
+		MinVersion: tls.VersionTLS13, ServerName: pin, InsecureSkipVerify: true,
 		VerifyPeerCertificate: func(raw [][]byte, _ [][]*x509.Certificate) error {
 			if len(raw) < 2 {
 				return errors.New("server did not present a CA chain")

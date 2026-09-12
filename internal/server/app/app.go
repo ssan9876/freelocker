@@ -245,10 +245,7 @@ func (a *App) activate(k *bootstrap.Keys) error {
 		a.log.Info("recompiled policies", "count", n)
 	}
 	alerts := alerting.New(a.store)
-	tlsCfg, err := agentapi.TLSConfig(k, a.cfg.PublicHostnames, time.Now())
-	if err != nil {
-		return err
-	}
+	tlsCfg := agentapi.NewTenantTLS(a.keyProvider, a.store, a.cfg.PublicHostnames, time.Now).Config()
 	lis, err := net.Listen("tcp", a.cfg.AgentListen)
 	if err != nil {
 		return fmt.Errorf("agent listener: %w", err)

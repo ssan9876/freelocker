@@ -55,15 +55,21 @@ with a provider-level super-admin who can create and switch between tenants.
   single-tenant behavior is unchanged (all existing tests green).
   `keyset.TestPerTenantKeyIsolation` proves two tenants get distinct CAs and
   that one tenant's key neither signs nor verifies another's policy.
-- **Phase 1b — per-tenant transport (the remaining hard part).** The agent
-  mTLS still uses one tenant's CA for the *server* certificate and client-CA
-  pool, so a second tenant's agent cannot yet complete the handshake or enroll
-  over the wire (its token pins its own CA, which the server doesn't present).
-  Fix: server `tls.Config.GetCertificate` selects a per-tenant server cert by
-  SNI (agents send a tenant marker, e.g. the CA pin, as ServerName; the cert's
-  SAN carries it), and `ClientCAs` becomes the union of all tenant CAs. This is
-  handshake-sensitive and gets its own careful pass with the two-tenant
-  over-the-wire enrollment test.
+- **Phase 1b — per-tenant transport. DONE.** `internal/server/agentapi.TenantTLS`
+  builds the agent-facing mTLS: `GetCertificate` selects a per-tenant server
+  cert by SNI — agents send their CA pin as `ServerName`, and the issued cert
+  carries that pin in its SANs so an agent verifying the hostname (Connect uses
+  `RootCAs` + `ServerName = pin`) accepts it; empty/unknown SNI falls back to the
+  default (first) tenant. `GetConfigForClient` sets `ClientCAs` to the union of
+  all tenant CAs with `VerifyClientCertIfGiven` (Enroll runs before the agent has
+  a cert). Tenants/certs are resolved through `keyset.Provider` and cached with a
+  30s TTL (`store.ListTenants`), so tenants added at runtime are picked up.
+  Agents (sim + `agent/identity`, both `pinnedTLS` and `TLSConfig`) send the pin
+  as SNI. Single-tenant is unchanged: the one agent sends the one pin and gets
+  the one cert (or falls back). `agentapi.TestMultiTenantEnrollmentOverTheWire`
+  proves two tenants each enroll and `GetPolicy` over one server via SNI, that
+  each device is bound to its own tenant, and that tenant A's cert cannot ride
+  tenant B's SNI + roots.
 - **Phase 2 — global-email login.** Add the global-unique-email migration and
   `GetAdminByEmailGlobal`; login resolves tenant from the admin. Test: two
   tenants, an admin in each, each logs into their own tenant; duplicate email

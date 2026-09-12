@@ -3,7 +3,6 @@ package agentapi
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"log/slog"
 	"time"
 
@@ -45,24 +44,11 @@ func (d Deps) keys(ctx context.Context, tenantID uuid.UUID) (*bootstrap.Keys, er
 	return d.Keys, nil
 }
 
-// TLSConfig issues a fresh agent-facing server certificate from the
-// internal CA. Client certs are optional at the TLS layer because
-// Enroll is called before the agent has one; the Agent service
-// enforces them in an interceptor.
-func TLSConfig(k *bootstrap.Keys, hostnames []string, now time.Time) (*tls.Config, error) {
-	cert, err := k.CA.IssueServerCert(hostnames, now)
-	if err != nil {
-		return nil, err
-	}
-	pool := x509.NewCertPool()
-	pool.AddCert(k.CA.Cert)
-	return &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		ClientAuth:   tls.VerifyClientCertIfGiven,
-		ClientCAs:    pool,
-		MinVersion:   tls.VersionTLS13,
-	}, nil
-}
+// The agent-facing TLS config is built by TenantTLS (see tenanttls.go),
+// which selects a per-tenant server certificate by SNI and trusts the union
+// of all tenant CAs for client-certificate auth. Client certs are optional
+// at the TLS layer because Enroll is called before the agent has one; the
+// Agent service enforces them in an interceptor.
 
 func NewGRPCServer(d Deps, tlsCfg *tls.Config) *grpc.Server {
 	if d.Now == nil {

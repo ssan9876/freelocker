@@ -14,6 +14,15 @@ func (s *Store) CreateTenant(ctx context.Context, name string) (uuid.UUID, error
 	return id, err
 }
 
+// ListTenants returns all tenant ids, oldest first.
+func (s *Store) ListTenants(ctx context.Context) ([]uuid.UUID, error) {
+	rows, _ := s.pool.Query(ctx, `SELECT id FROM tenants ORDER BY created_at`)
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (uuid.UUID, error) {
+		var id uuid.UUID
+		return id, r.Scan(&id)
+	})
+}
+
 // FirstTenant returns the oldest tenant. v1 is single-tenant.
 func (s *Store) FirstTenant(ctx context.Context) (uuid.UUID, error) {
 	var id uuid.UUID
