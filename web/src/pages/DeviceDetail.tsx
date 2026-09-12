@@ -90,14 +90,14 @@ export function DeviceDetail() {
     }
   };
 
-  const promote = async (sha256: string, description: string) => {
+  const promote = async (sha256: string, description: string, kind: "hash" | "publisher" = "hash") => {
     if (!promoteTo) {
       notify("Choose a policy first", "error");
       return;
     }
     try {
-      await api.post("/api/observations/promote", { policy_id: promoteTo, sha256, description });
-      notify("Added to policy");
+      await api.post("/api/observations/promote", { policy_id: promoteTo, sha256, description, kind });
+      notify(kind === "publisher" ? "Publisher allowed — survives app updates" : "Added to policy");
     } catch (e) {
       notify(e instanceof ApiError ? e.message : "Could not add rule", "error");
     }
@@ -348,6 +348,7 @@ export function DeviceDetail() {
                 <thead>
                   <tr>
                     <th>Path</th>
+                    <th>Publisher</th>
                     <th>SHA-256</th>
                     <th>Count</th>
                     <th></th>
@@ -357,11 +358,34 @@ export function DeviceDetail() {
                   {obs.map((o) => (
                     <tr key={o.sha256 + o.path}>
                       <td className="mono">{o.path}</td>
+                      <td>
+                        {o.signer_verified ? (
+                          o.signer || "Signed"
+                        ) : o.signer || o.signer_tbs ? (
+                          <span title="Windows could not verify this signature">
+                            {o.signer || "Unknown"} (unverified)
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td className="mono">{o.sha256.slice(0, 16)}…</td>
                       <td className="mono">{o.count}</td>
-                      <td>
+                      <td style={{ whiteSpace: "nowrap" }}>
                         <button className="ghost" onClick={() => promote(o.sha256, o.path)}>
                           Add as rule
+                        </button>
+                        <button
+                          className="ghost"
+                          disabled={!o.signer_verified || !o.signer_tbs}
+                          title={
+                            o.signer_verified && o.signer_tbs
+                              ? `Allow everything signed by ${o.signer || "this publisher"}`
+                              : "Needs a signature Windows can verify"
+                          }
+                          onClick={() => promote(o.sha256, o.signer || o.path, "publisher")}
+                        >
+                          Add as publisher
                         </button>
                       </td>
                     </tr>

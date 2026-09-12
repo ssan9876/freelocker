@@ -132,6 +132,8 @@ export type Observation = {
   sha256: string;
   path: string;
   signer: string;
+  signer_tbs: string;
+  signer_verified: boolean;
   count: number;
   first_seen: string;
   last_seen: string;
@@ -160,6 +162,8 @@ export type BlockEvent = {
   sha256: string;
   path: string;
   signer: string;
+  signer_tbs: string;
+  signer_verified: boolean;
   blocked: boolean;
   at: string;
 };
@@ -171,6 +175,8 @@ export type ApprovalRequest = {
   sha256: string;
   path: string;
   signer: string;
+  signer_tbs: string;
+  signer_verified: boolean;
   status: ApprovalStatus;
   device_count: number;
   event_count: number;
