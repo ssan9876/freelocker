@@ -34,9 +34,9 @@ export function Login() {
         </h1>
         <p className="auth-sub">Sign in to the management console.</p>
         <label>Email</label>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
+        <input aria-label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
         <label>Password</label>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <input aria-label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         {err && <p className="err">{err}</p>}
         <div className="btn-row">
           <button className="primary" disabled={busy}>

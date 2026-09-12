@@ -29,11 +29,12 @@ export function Setup({ onDone }: { onDone: () => void }) {
         </h1>
         <p className="auth-sub">Create your organization and the first owner account.</p>
         <label>Organization name</label>
-        <input value={org} onChange={(e) => setOrg(e.target.value)} autoFocus />
+        <input aria-label="Organization name" value={org} onChange={(e) => setOrg(e.target.value)} autoFocus />
         <label>Owner email</label>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input aria-label="Owner email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <label>Password</label>
         <input
+          aria-label="Password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

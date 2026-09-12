@@ -84,3 +84,28 @@ func TestInitializeValidatesInput(t *testing.T) {
 		t.Error("bad role must fail")
 	}
 }
+
+// TestHealthRoutesThroughMux guards against the mux shadowing /healthz and
+// /readyz with the SPA fallback (they must reach the API handler).
+func TestHealthRoutesThroughMux(t *testing.T) {
+	s := storetest.New(t)
+	a, err := NewWithStore(testConfig(), s, bytes.Repeat([]byte{7}, 32), slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(a.Close)
+	srv := httptest.NewServer(a.Handler())
+	defer srv.Close()
+
+	for _, path := range []string{"/healthz", "/readyz"} {
+		resp, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ct := resp.Header.Get("Content-Type")
+		resp.Body.Close()
+		if resp.StatusCode != 200 || !strings.HasPrefix(ct, "application/json") {
+			t.Errorf("%s = %d %q, want 200 application/json (not the SPA)", path, resp.StatusCode, ct)
+		}
+	}
+}

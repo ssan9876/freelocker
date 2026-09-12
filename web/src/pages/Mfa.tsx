@@ -58,7 +58,7 @@ export function Mfa() {
             </p>
             <label>Setup key</label>
             <div className="copybox">
-              <input readOnly value={secret} onFocus={(e) => e.target.select()} />
+              <input aria-label="Setup key" readOnly value={secret} onFocus={(e) => e.target.select()} />
               <button type="button" className="ghost" onClick={() => navigator.clipboard?.writeText(secret)}>
                 Copy
               </button>

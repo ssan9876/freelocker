@@ -89,6 +89,8 @@ func NewWithStore(cfg config.Config, s *store.Store, master []byte, log *slog.Lo
 	mux := http.NewServeMux()
 	mux.Handle("/api/", apiHandler)
 	mux.Handle("/agent/", apiHandler)
+	mux.Handle("/healthz", apiHandler)
+	mux.Handle("/readyz", apiHandler)
 	if webui.Enabled() {
 		mux.Handle("/", webui.Handler())
 	} else {

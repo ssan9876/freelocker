@@ -50,3 +50,50 @@ jobs:
       - name: Type-check and build the console
         run: npm run build
         working-directory: web
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: freelocker
+          POSTGRES_PASSWORD: freelocker
+          POSTGRES_DB: freelocker
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U freelocker"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - name: Build the console (embedded in the server)
+        run: npm run build
+        working-directory: web
+      - name: Build the server
+        run: go build -o freelocker-server ./cmd/server
+      - name: Start the server against the fresh Postgres service
+        run: |
+          FREELOCKER_DATABASE_URL="postgres://freelocker:freelocker@localhost:55432/freelocker?sslmode=disable" \
+          FREELOCKER_INSECURE_COOKIES=true \
+          FREELOCKER_CONSOLE_LISTEN=127.0.0.1:8080 \
+          FREELOCKER_AGENT_LISTEN=127.0.0.1:8443 \
+          ./freelocker-server serve &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8080/readyz && break; sleep 1; done
+      - name: Run E2E
+        run: E2E_BASE_URL=http://127.0.0.1:8080 npm run test:e2e
+        working-directory: web
