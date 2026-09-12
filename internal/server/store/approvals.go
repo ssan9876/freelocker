@@ -13,6 +13,8 @@ type ApprovalRequest struct {
 	ID, PolicyID                 uuid.UUID
 	PolicyName                   string
 	SHA256, Path, Signer, Status string
+	SignerTBS                    string
+	SignerVerified               bool
 	DeviceCount                  int
 	EventCount                   int64
 	FirstSeen, LastSeen          time.Time
@@ -26,9 +28,11 @@ type ApprovalRequest struct {
 // changed, so a decided hash stays decided.
 func (s *Store) UpsertApprovalRequests(ctx context.Context, tenantID, policyID, deviceID uuid.UUID, events []BlockEvent) error {
 	type agg struct {
-		path, signer string
-		n            int64
-		first, last  time.Time
+		path, signer   string
+		signerTBS      string
+		signerVerified bool
+		n              int64
+		first, last    time.Time
 	}
 	byHash := map[string]*agg{}
 	var order []string
@@ -53,6 +57,10 @@ func (s *Store) UpsertApprovalRequests(ctx context.Context, tenantID, policyID, 
 		if a.signer == "" {
 			a.signer = e.Signer
 		}
+		if a.signerTBS == "" {
+			a.signerTBS = e.SignerTBS
+		}
+		a.signerVerified = a.signerVerified || e.SignerVerified
 		if at.Before(a.first) {
 			a.first = at
 		}
@@ -73,16 +81,18 @@ func (s *Store) UpsertApprovalRequests(ctx context.Context, tenantID, policyID, 
 		a := byHash[h]
 		var id uuid.UUID
 		err := tx.QueryRow(ctx, `
-			INSERT INTO approval_requests (id, tenant_id, policy_id, sha256, path, signer, event_count, first_seen, last_seen)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+			INSERT INTO approval_requests (id, tenant_id, policy_id, sha256, path, signer, signer_tbs, signer_verified, event_count, first_seen, last_seen)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 			ON CONFLICT (policy_id, sha256) DO UPDATE SET
 				event_count = approval_requests.event_count + EXCLUDED.event_count,
 				first_seen = LEAST(approval_requests.first_seen, EXCLUDED.first_seen),
 				last_seen = GREATEST(approval_requests.last_seen, EXCLUDED.last_seen),
 				path = CASE WHEN approval_requests.path = '' THEN EXCLUDED.path ELSE approval_requests.path END,
-				signer = CASE WHEN approval_requests.signer = '' THEN EXCLUDED.signer ELSE approval_requests.signer END
+				signer = CASE WHEN approval_requests.signer = '' THEN EXCLUDED.signer ELSE approval_requests.signer END,
+				signer_tbs = CASE WHEN approval_requests.signer_tbs = '' THEN EXCLUDED.signer_tbs ELSE approval_requests.signer_tbs END,
+				signer_verified = (approval_requests.signer_verified OR EXCLUDED.signer_verified)
 			RETURNING id`,
-			uuid.New(), tenantID, policyID, h, a.path, a.signer, a.n, a.first, a.last).Scan(&id)
+			uuid.New(), tenantID, policyID, h, a.path, a.signer, a.signerTBS, a.signerVerified, a.n, a.first, a.last).Scan(&id)
 		if err != nil {
 			return err
 		}
@@ -102,13 +112,13 @@ func (s *Store) UpsertApprovalRequests(ctx context.Context, tenantID, policyID, 
 }
 
 const approvalSelect = `
-	SELECT ar.id, ar.policy_id, p.name, ar.sha256, ar.path, ar.signer, ar.status,
+	SELECT ar.id, ar.policy_id, p.name, ar.sha256, ar.path, ar.signer, ar.signer_tbs, ar.signer_verified, ar.status,
 		ar.device_count, ar.event_count, ar.first_seen, ar.last_seen, ar.decided_by, ar.decided_at
 	FROM approval_requests ar JOIN policies p ON p.id = ar.policy_id`
 
 func scanApproval(row pgx.Row) (ApprovalRequest, error) {
 	var a ApprovalRequest
-	err := row.Scan(&a.ID, &a.PolicyID, &a.PolicyName, &a.SHA256, &a.Path, &a.Signer, &a.Status,
+	err := row.Scan(&a.ID, &a.PolicyID, &a.PolicyName, &a.SHA256, &a.Path, &a.Signer, &a.SignerTBS, &a.SignerVerified, &a.Status,
 		&a.DeviceCount, &a.EventCount, &a.FirstSeen, &a.LastSeen, &a.DecidedBy, &a.DecidedAt)
 	return a, err
 }
