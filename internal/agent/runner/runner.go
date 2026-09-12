@@ -13,6 +13,7 @@ import (
 	flv1 "freelocker/gen/freelocker/v1"
 	"freelocker/internal/agent/controls"
 	"freelocker/internal/agent/enforcer"
+	"freelocker/internal/agent/events"
 	"freelocker/internal/agent/executor"
 	"freelocker/internal/agent/identity"
 	"freelocker/internal/agent/inventory"
@@ -54,6 +55,10 @@ type Runner struct {
 	// Device controls (optional). When Controls is set, the runner pulls
 	// and applies device controls on the app-control tick.
 	Controls controls.Enforcer
+
+	// Events (optional). When set, the runner reports device events
+	// (process launches, logons) on the metrics ticker.
+	Events events.Reader
 }
 
 func HardwareInfo(c inventory.Collector) *flv1.HardwareInfo {
@@ -286,13 +291,12 @@ func (r *Runner) metricsLoop(ctx context.Context, client flv1.AgentClient) {
 		s, err := collect()
 		if err != nil {
 			r.log().Warn("collect metrics", "err", err)
-			return
-		}
-		if _, err := client.ReportMetrics(ctx, &flv1.MetricsRequest{
+		} else if _, err := client.ReportMetrics(ctx, &flv1.MetricsRequest{
 			CpuPct: s.CPUPct, MemPct: s.MemPct, DiskPct: s.DiskPct,
 		}); err != nil {
 			r.log().Warn("report metrics", "err", err)
 		}
+		r.reportEvents(ctx, client)
 	}
 	report()
 	t := time.NewTicker(r.MetricsInterval)
@@ -304,6 +308,23 @@ func (r *Runner) metricsLoop(ctx context.Context, client flv1.AgentClient) {
 		case <-t.C:
 			report()
 		}
+	}
+}
+
+func (r *Runner) reportEvents(ctx context.Context, client flv1.AgentClient) {
+	if r.Events == nil {
+		return
+	}
+	evs, err := r.Events.Read()
+	if err != nil || len(evs) == 0 {
+		return
+	}
+	out := make([]*flv1.DeviceEvent, 0, len(evs))
+	for _, e := range evs {
+		out = append(out, &flv1.DeviceEvent{Kind: e.Kind, Summary: e.Summary, AtUnix: e.At.Unix()})
+	}
+	if _, err := client.ReportEvents(ctx, &flv1.EventsRequest{Events: out}); err != nil {
+		r.log().Warn("report events", "err", err)
 	}
 }
 

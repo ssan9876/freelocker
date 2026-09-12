@@ -79,6 +79,110 @@ func (CommandType) EnumDescriptor() ([]byte, []int) {
 	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{0}
 }
 
+type DeviceEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"` // process_launch | logon
+	Summary       string                 `protobuf:"bytes,2,opt,name=summary,proto3" json:"summary,omitempty"`
+	AtUnix        int64                  `protobuf:"varint,3,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeviceEvent) Reset() {
+	*x = DeviceEvent{}
+	mi := &file_freelocker_v1_agent_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeviceEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeviceEvent) ProtoMessage() {}
+
+func (x *DeviceEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_freelocker_v1_agent_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeviceEvent.ProtoReflect.Descriptor instead.
+func (*DeviceEvent) Descriptor() ([]byte, []int) {
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *DeviceEvent) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *DeviceEvent) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+func (x *DeviceEvent) GetAtUnix() int64 {
+	if x != nil {
+		return x.AtUnix
+	}
+	return 0
+}
+
+type EventsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Events        []*DeviceEvent         `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EventsRequest) Reset() {
+	*x = EventsRequest{}
+	mi := &file_freelocker_v1_agent_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EventsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EventsRequest) ProtoMessage() {}
+
+func (x *EventsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_freelocker_v1_agent_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EventsRequest.ProtoReflect.Descriptor instead.
+func (*EventsRequest) Descriptor() ([]byte, []int) {
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *EventsRequest) GetEvents() []*DeviceEvent {
+	if x != nil {
+		return x.Events
+	}
+	return nil
+}
+
 type GetControlsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -87,7 +191,7 @@ type GetControlsRequest struct {
 
 func (x *GetControlsRequest) Reset() {
 	*x = GetControlsRequest{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[0]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -99,7 +203,7 @@ func (x *GetControlsRequest) String() string {
 func (*GetControlsRequest) ProtoMessage() {}
 
 func (x *GetControlsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[0]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -112,7 +216,7 @@ func (x *GetControlsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetControlsRequest.ProtoReflect.Descriptor instead.
 func (*GetControlsRequest) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{0}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{2}
 }
 
 type ControlsResponse struct {
@@ -126,7 +230,7 @@ type ControlsResponse struct {
 
 func (x *ControlsResponse) Reset() {
 	*x = ControlsResponse{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[1]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -138,7 +242,7 @@ func (x *ControlsResponse) String() string {
 func (*ControlsResponse) ProtoMessage() {}
 
 func (x *ControlsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[1]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -151,7 +255,7 @@ func (x *ControlsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlsResponse.ProtoReflect.Descriptor instead.
 func (*ControlsResponse) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{1}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ControlsResponse) GetUsbStorageBlocked() bool {
@@ -186,7 +290,7 @@ type MetricsRequest struct {
 
 func (x *MetricsRequest) Reset() {
 	*x = MetricsRequest{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[2]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -198,7 +302,7 @@ func (x *MetricsRequest) String() string {
 func (*MetricsRequest) ProtoMessage() {}
 
 func (x *MetricsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[2]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -211,7 +315,7 @@ func (x *MetricsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricsRequest.ProtoReflect.Descriptor instead.
 func (*MetricsRequest) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{2}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *MetricsRequest) GetCpuPct() float64 {
@@ -243,7 +347,7 @@ type Ack struct {
 
 func (x *Ack) Reset() {
 	*x = Ack{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[3]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -255,7 +359,7 @@ func (x *Ack) String() string {
 func (*Ack) ProtoMessage() {}
 
 func (x *Ack) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[3]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -268,7 +372,7 @@ func (x *Ack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ack.ProtoReflect.Descriptor instead.
 func (*Ack) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{3}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{5}
 }
 
 type GetPolicyRequest struct {
@@ -279,7 +383,7 @@ type GetPolicyRequest struct {
 
 func (x *GetPolicyRequest) Reset() {
 	*x = GetPolicyRequest{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[4]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -291,7 +395,7 @@ func (x *GetPolicyRequest) String() string {
 func (*GetPolicyRequest) ProtoMessage() {}
 
 func (x *GetPolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[4]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -304,7 +408,7 @@ func (x *GetPolicyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPolicyRequest.ProtoReflect.Descriptor instead.
 func (*GetPolicyRequest) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{4}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{6}
 }
 
 type GetPolicyResponse struct {
@@ -319,7 +423,7 @@ type GetPolicyResponse struct {
 
 func (x *GetPolicyResponse) Reset() {
 	*x = GetPolicyResponse{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[5]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -331,7 +435,7 @@ func (x *GetPolicyResponse) String() string {
 func (*GetPolicyResponse) ProtoMessage() {}
 
 func (x *GetPolicyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[5]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -344,7 +448,7 @@ func (x *GetPolicyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPolicyResponse.ProtoReflect.Descriptor instead.
 func (*GetPolicyResponse) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{5}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetPolicyResponse) GetVersion() string {
@@ -387,7 +491,7 @@ type ObservedApp struct {
 
 func (x *ObservedApp) Reset() {
 	*x = ObservedApp{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[6]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -399,7 +503,7 @@ func (x *ObservedApp) String() string {
 func (*ObservedApp) ProtoMessage() {}
 
 func (x *ObservedApp) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[6]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -412,7 +516,7 @@ func (x *ObservedApp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObservedApp.ProtoReflect.Descriptor instead.
 func (*ObservedApp) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{6}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ObservedApp) GetSha256() string {
@@ -445,7 +549,7 @@ type ObserveRequest struct {
 
 func (x *ObserveRequest) Reset() {
 	*x = ObserveRequest{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[7]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -457,7 +561,7 @@ func (x *ObserveRequest) String() string {
 func (*ObserveRequest) ProtoMessage() {}
 
 func (x *ObserveRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[7]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -470,7 +574,7 @@ func (x *ObserveRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObserveRequest.ProtoReflect.Descriptor instead.
 func (*ObserveRequest) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{7}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ObserveRequest) GetApps() []*ObservedApp {
@@ -493,7 +597,7 @@ type BlockEvent struct {
 
 func (x *BlockEvent) Reset() {
 	*x = BlockEvent{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[8]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -505,7 +609,7 @@ func (x *BlockEvent) String() string {
 func (*BlockEvent) ProtoMessage() {}
 
 func (x *BlockEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[8]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -518,7 +622,7 @@ func (x *BlockEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockEvent.ProtoReflect.Descriptor instead.
 func (*BlockEvent) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{8}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *BlockEvent) GetSha256() string {
@@ -565,7 +669,7 @@ type ReportBlocksRequest struct {
 
 func (x *ReportBlocksRequest) Reset() {
 	*x = ReportBlocksRequest{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[9]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -577,7 +681,7 @@ func (x *ReportBlocksRequest) String() string {
 func (*ReportBlocksRequest) ProtoMessage() {}
 
 func (x *ReportBlocksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[9]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -590,7 +694,7 @@ func (x *ReportBlocksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportBlocksRequest.ProtoReflect.Descriptor instead.
 func (*ReportBlocksRequest) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{9}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ReportBlocksRequest) GetEvents() []*BlockEvent {
@@ -611,7 +715,7 @@ type HardwareInfo struct {
 
 func (x *HardwareInfo) Reset() {
 	*x = HardwareInfo{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[10]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -623,7 +727,7 @@ func (x *HardwareInfo) String() string {
 func (*HardwareInfo) ProtoMessage() {}
 
 func (x *HardwareInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[10]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -636,7 +740,7 @@ func (x *HardwareInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HardwareInfo.ProtoReflect.Descriptor instead.
 func (*HardwareInfo) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{10}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HardwareInfo) GetHostname() string {
@@ -671,7 +775,7 @@ type EnrollRequest struct {
 
 func (x *EnrollRequest) Reset() {
 	*x = EnrollRequest{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[11]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -683,7 +787,7 @@ func (x *EnrollRequest) String() string {
 func (*EnrollRequest) ProtoMessage() {}
 
 func (x *EnrollRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[11]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -696,7 +800,7 @@ func (x *EnrollRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnrollRequest.ProtoReflect.Descriptor instead.
 func (*EnrollRequest) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{11}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *EnrollRequest) GetTokenSecret() string {
@@ -734,7 +838,7 @@ type EnrollResponse struct {
 
 func (x *EnrollResponse) Reset() {
 	*x = EnrollResponse{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[12]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -746,7 +850,7 @@ func (x *EnrollResponse) String() string {
 func (*EnrollResponse) ProtoMessage() {}
 
 func (x *EnrollResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[12]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -759,7 +863,7 @@ func (x *EnrollResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnrollResponse.ProtoReflect.Descriptor instead.
 func (*EnrollResponse) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{12}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *EnrollResponse) GetDeviceId() string {
@@ -819,7 +923,7 @@ type Inventory struct {
 
 func (x *Inventory) Reset() {
 	*x = Inventory{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[13]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -831,7 +935,7 @@ func (x *Inventory) String() string {
 func (*Inventory) ProtoMessage() {}
 
 func (x *Inventory) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[13]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -844,7 +948,7 @@ func (x *Inventory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Inventory.ProtoReflect.Descriptor instead.
 func (*Inventory) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{13}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Inventory) GetHostname() string {
@@ -906,7 +1010,7 @@ type Heartbeat struct {
 
 func (x *Heartbeat) Reset() {
 	*x = Heartbeat{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[14]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -918,7 +1022,7 @@ func (x *Heartbeat) String() string {
 func (*Heartbeat) ProtoMessage() {}
 
 func (x *Heartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[14]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -931,7 +1035,7 @@ func (x *Heartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Heartbeat.ProtoReflect.Descriptor instead.
 func (*Heartbeat) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{14}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Heartbeat) GetInventory() *Inventory {
@@ -959,7 +1063,7 @@ type CommandResult struct {
 
 func (x *CommandResult) Reset() {
 	*x = CommandResult{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[15]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -971,7 +1075,7 @@ func (x *CommandResult) String() string {
 func (*CommandResult) ProtoMessage() {}
 
 func (x *CommandResult) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[15]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -984,7 +1088,7 @@ func (x *CommandResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandResult.ProtoReflect.Descriptor instead.
 func (*CommandResult) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{15}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CommandResult) GetCommandId() string {
@@ -1019,7 +1123,7 @@ type Goodbye struct {
 
 func (x *Goodbye) Reset() {
 	*x = Goodbye{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[16]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1031,7 +1135,7 @@ func (x *Goodbye) String() string {
 func (*Goodbye) ProtoMessage() {}
 
 func (x *Goodbye) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[16]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1044,7 +1148,7 @@ func (x *Goodbye) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Goodbye.ProtoReflect.Descriptor instead.
 func (*Goodbye) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{16}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Goodbye) GetReason() string {
@@ -1068,7 +1172,7 @@ type AgentMessage struct {
 
 func (x *AgentMessage) Reset() {
 	*x = AgentMessage{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[17]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1080,7 +1184,7 @@ func (x *AgentMessage) String() string {
 func (*AgentMessage) ProtoMessage() {}
 
 func (x *AgentMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[17]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1093,7 +1197,7 @@ func (x *AgentMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentMessage.ProtoReflect.Descriptor instead.
 func (*AgentMessage) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{17}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *AgentMessage) GetBody() isAgentMessage_Body {
@@ -1166,7 +1270,7 @@ type Command struct {
 
 func (x *Command) Reset() {
 	*x = Command{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[18]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1178,7 +1282,7 @@ func (x *Command) String() string {
 func (*Command) ProtoMessage() {}
 
 func (x *Command) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[18]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1191,7 +1295,7 @@ func (x *Command) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Command.ProtoReflect.Descriptor instead.
 func (*Command) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{18}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Command) GetId() string {
@@ -1248,7 +1352,7 @@ type SignedCommand struct {
 
 func (x *SignedCommand) Reset() {
 	*x = SignedCommand{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[19]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1260,7 +1364,7 @@ func (x *SignedCommand) String() string {
 func (*SignedCommand) ProtoMessage() {}
 
 func (x *SignedCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[19]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1273,7 +1377,7 @@ func (x *SignedCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignedCommand.ProtoReflect.Descriptor instead.
 func (*SignedCommand) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{19}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *SignedCommand) GetCommand() []byte {
@@ -1302,7 +1406,7 @@ type ServerMessage struct {
 
 func (x *ServerMessage) Reset() {
 	*x = ServerMessage{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[20]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1314,7 +1418,7 @@ func (x *ServerMessage) String() string {
 func (*ServerMessage) ProtoMessage() {}
 
 func (x *ServerMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[20]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1327,7 +1431,7 @@ func (x *ServerMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerMessage.ProtoReflect.Descriptor instead.
 func (*ServerMessage) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{20}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ServerMessage) GetBody() isServerMessage_Body {
@@ -1365,7 +1469,7 @@ type RenewRequest struct {
 
 func (x *RenewRequest) Reset() {
 	*x = RenewRequest{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[21]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1377,7 +1481,7 @@ func (x *RenewRequest) String() string {
 func (*RenewRequest) ProtoMessage() {}
 
 func (x *RenewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[21]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1390,7 +1494,7 @@ func (x *RenewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenewRequest.ProtoReflect.Descriptor instead.
 func (*RenewRequest) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{21}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *RenewRequest) GetCsrDer() []byte {
@@ -1409,7 +1513,7 @@ type RenewResponse struct {
 
 func (x *RenewResponse) Reset() {
 	*x = RenewResponse{}
-	mi := &file_freelocker_v1_agent_proto_msgTypes[22]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1421,7 +1525,7 @@ func (x *RenewResponse) String() string {
 func (*RenewResponse) ProtoMessage() {}
 
 func (x *RenewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_freelocker_v1_agent_proto_msgTypes[22]
+	mi := &file_freelocker_v1_agent_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1434,7 +1538,7 @@ func (x *RenewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenewResponse.ProtoReflect.Descriptor instead.
 func (*RenewResponse) Descriptor() ([]byte, []int) {
-	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{22}
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RenewResponse) GetCertDer() []byte {
@@ -1448,7 +1552,13 @@ var File_freelocker_v1_agent_proto protoreflect.FileDescriptor
 
 const file_freelocker_v1_agent_proto_rawDesc = "" +
 	"\n" +
-	"\x19freelocker/v1/agent.proto\x12\rfreelocker.v1\"\x14\n" +
+	"\x19freelocker/v1/agent.proto\x12\rfreelocker.v1\"T\n" +
+	"\vDeviceEvent\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x18\n" +
+	"\asummary\x18\x02 \x01(\tR\asummary\x12\x17\n" +
+	"\aat_unix\x18\x03 \x01(\x03R\x06atUnix\"C\n" +
+	"\rEventsRequest\x122\n" +
+	"\x06events\x18\x01 \x03(\v2\x1a.freelocker.v1.DeviceEventR\x06events\"\x14\n" +
 	"\x12GetControlsRequest\"\x98\x01\n" +
 	"\x10ControlsResponse\x12.\n" +
 	"\x13usb_storage_blocked\x18\x01 \x01(\bR\x11usbStorageBlocked\x12'\n" +
@@ -1545,7 +1655,7 @@ const file_freelocker_v1_agent_proto_rawDesc = "" +
 	"\x19COMMAND_TYPE_UPDATE_AGENT\x10\x052S\n" +
 	"\n" +
 	"Enrollment\x12E\n" +
-	"\x06Enroll\x12\x1c.freelocker.v1.EnrollRequest\x1a\x1d.freelocker.v1.EnrollResponse2\x8d\x04\n" +
+	"\x06Enroll\x12\x1c.freelocker.v1.EnrollRequest\x1a\x1d.freelocker.v1.EnrollResponse2\xcf\x04\n" +
 	"\x05Agent\x12H\n" +
 	"\aConnect\x12\x1b.freelocker.v1.AgentMessage\x1a\x1c.freelocker.v1.ServerMessage(\x010\x01\x12M\n" +
 	"\x10RenewCertificate\x12\x1b.freelocker.v1.RenewRequest\x1a\x1c.freelocker.v1.RenewResponse\x12N\n" +
@@ -1553,7 +1663,8 @@ const file_freelocker_v1_agent_proto_rawDesc = "" +
 	"\aObserve\x12\x1d.freelocker.v1.ObserveRequest\x1a\x12.freelocker.v1.Ack\x12F\n" +
 	"\fReportBlocks\x12\".freelocker.v1.ReportBlocksRequest\x1a\x12.freelocker.v1.Ack\x12B\n" +
 	"\rReportMetrics\x12\x1d.freelocker.v1.MetricsRequest\x1a\x12.freelocker.v1.Ack\x12Q\n" +
-	"\vGetControls\x12!.freelocker.v1.GetControlsRequest\x1a\x1f.freelocker.v1.ControlsResponseB#Z!freelocker/gen/freelocker/v1;flv1b\x06proto3"
+	"\vGetControls\x12!.freelocker.v1.GetControlsRequest\x1a\x1f.freelocker.v1.ControlsResponse\x12@\n" +
+	"\fReportEvents\x12\x1c.freelocker.v1.EventsRequest\x1a\x12.freelocker.v1.AckB#Z!freelocker/gen/freelocker/v1;flv1b\x06proto3"
 
 var (
 	file_freelocker_v1_agent_proto_rawDescOnce sync.Once
@@ -1568,64 +1679,69 @@ func file_freelocker_v1_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_freelocker_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_freelocker_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_freelocker_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_freelocker_v1_agent_proto_goTypes = []any{
 	(CommandType)(0),            // 0: freelocker.v1.CommandType
-	(*GetControlsRequest)(nil),  // 1: freelocker.v1.GetControlsRequest
-	(*ControlsResponse)(nil),    // 2: freelocker.v1.ControlsResponse
-	(*MetricsRequest)(nil),      // 3: freelocker.v1.MetricsRequest
-	(*Ack)(nil),                 // 4: freelocker.v1.Ack
-	(*GetPolicyRequest)(nil),    // 5: freelocker.v1.GetPolicyRequest
-	(*GetPolicyResponse)(nil),   // 6: freelocker.v1.GetPolicyResponse
-	(*ObservedApp)(nil),         // 7: freelocker.v1.ObservedApp
-	(*ObserveRequest)(nil),      // 8: freelocker.v1.ObserveRequest
-	(*BlockEvent)(nil),          // 9: freelocker.v1.BlockEvent
-	(*ReportBlocksRequest)(nil), // 10: freelocker.v1.ReportBlocksRequest
-	(*HardwareInfo)(nil),        // 11: freelocker.v1.HardwareInfo
-	(*EnrollRequest)(nil),       // 12: freelocker.v1.EnrollRequest
-	(*EnrollResponse)(nil),      // 13: freelocker.v1.EnrollResponse
-	(*Inventory)(nil),           // 14: freelocker.v1.Inventory
-	(*Heartbeat)(nil),           // 15: freelocker.v1.Heartbeat
-	(*CommandResult)(nil),       // 16: freelocker.v1.CommandResult
-	(*Goodbye)(nil),             // 17: freelocker.v1.Goodbye
-	(*AgentMessage)(nil),        // 18: freelocker.v1.AgentMessage
-	(*Command)(nil),             // 19: freelocker.v1.Command
-	(*SignedCommand)(nil),       // 20: freelocker.v1.SignedCommand
-	(*ServerMessage)(nil),       // 21: freelocker.v1.ServerMessage
-	(*RenewRequest)(nil),        // 22: freelocker.v1.RenewRequest
-	(*RenewResponse)(nil),       // 23: freelocker.v1.RenewResponse
+	(*DeviceEvent)(nil),         // 1: freelocker.v1.DeviceEvent
+	(*EventsRequest)(nil),       // 2: freelocker.v1.EventsRequest
+	(*GetControlsRequest)(nil),  // 3: freelocker.v1.GetControlsRequest
+	(*ControlsResponse)(nil),    // 4: freelocker.v1.ControlsResponse
+	(*MetricsRequest)(nil),      // 5: freelocker.v1.MetricsRequest
+	(*Ack)(nil),                 // 6: freelocker.v1.Ack
+	(*GetPolicyRequest)(nil),    // 7: freelocker.v1.GetPolicyRequest
+	(*GetPolicyResponse)(nil),   // 8: freelocker.v1.GetPolicyResponse
+	(*ObservedApp)(nil),         // 9: freelocker.v1.ObservedApp
+	(*ObserveRequest)(nil),      // 10: freelocker.v1.ObserveRequest
+	(*BlockEvent)(nil),          // 11: freelocker.v1.BlockEvent
+	(*ReportBlocksRequest)(nil), // 12: freelocker.v1.ReportBlocksRequest
+	(*HardwareInfo)(nil),        // 13: freelocker.v1.HardwareInfo
+	(*EnrollRequest)(nil),       // 14: freelocker.v1.EnrollRequest
+	(*EnrollResponse)(nil),      // 15: freelocker.v1.EnrollResponse
+	(*Inventory)(nil),           // 16: freelocker.v1.Inventory
+	(*Heartbeat)(nil),           // 17: freelocker.v1.Heartbeat
+	(*CommandResult)(nil),       // 18: freelocker.v1.CommandResult
+	(*Goodbye)(nil),             // 19: freelocker.v1.Goodbye
+	(*AgentMessage)(nil),        // 20: freelocker.v1.AgentMessage
+	(*Command)(nil),             // 21: freelocker.v1.Command
+	(*SignedCommand)(nil),       // 22: freelocker.v1.SignedCommand
+	(*ServerMessage)(nil),       // 23: freelocker.v1.ServerMessage
+	(*RenewRequest)(nil),        // 24: freelocker.v1.RenewRequest
+	(*RenewResponse)(nil),       // 25: freelocker.v1.RenewResponse
 }
 var file_freelocker_v1_agent_proto_depIdxs = []int32{
-	7,  // 0: freelocker.v1.ObserveRequest.apps:type_name -> freelocker.v1.ObservedApp
-	9,  // 1: freelocker.v1.ReportBlocksRequest.events:type_name -> freelocker.v1.BlockEvent
-	11, // 2: freelocker.v1.EnrollRequest.hardware:type_name -> freelocker.v1.HardwareInfo
-	14, // 3: freelocker.v1.Heartbeat.inventory:type_name -> freelocker.v1.Inventory
-	15, // 4: freelocker.v1.AgentMessage.heartbeat:type_name -> freelocker.v1.Heartbeat
-	16, // 5: freelocker.v1.AgentMessage.command_result:type_name -> freelocker.v1.CommandResult
-	17, // 6: freelocker.v1.AgentMessage.goodbye:type_name -> freelocker.v1.Goodbye
-	0,  // 7: freelocker.v1.Command.type:type_name -> freelocker.v1.CommandType
-	20, // 8: freelocker.v1.ServerMessage.command:type_name -> freelocker.v1.SignedCommand
-	12, // 9: freelocker.v1.Enrollment.Enroll:input_type -> freelocker.v1.EnrollRequest
-	18, // 10: freelocker.v1.Agent.Connect:input_type -> freelocker.v1.AgentMessage
-	22, // 11: freelocker.v1.Agent.RenewCertificate:input_type -> freelocker.v1.RenewRequest
-	5,  // 12: freelocker.v1.Agent.GetPolicy:input_type -> freelocker.v1.GetPolicyRequest
-	8,  // 13: freelocker.v1.Agent.Observe:input_type -> freelocker.v1.ObserveRequest
-	10, // 14: freelocker.v1.Agent.ReportBlocks:input_type -> freelocker.v1.ReportBlocksRequest
-	3,  // 15: freelocker.v1.Agent.ReportMetrics:input_type -> freelocker.v1.MetricsRequest
-	1,  // 16: freelocker.v1.Agent.GetControls:input_type -> freelocker.v1.GetControlsRequest
-	13, // 17: freelocker.v1.Enrollment.Enroll:output_type -> freelocker.v1.EnrollResponse
-	21, // 18: freelocker.v1.Agent.Connect:output_type -> freelocker.v1.ServerMessage
-	23, // 19: freelocker.v1.Agent.RenewCertificate:output_type -> freelocker.v1.RenewResponse
-	6,  // 20: freelocker.v1.Agent.GetPolicy:output_type -> freelocker.v1.GetPolicyResponse
-	4,  // 21: freelocker.v1.Agent.Observe:output_type -> freelocker.v1.Ack
-	4,  // 22: freelocker.v1.Agent.ReportBlocks:output_type -> freelocker.v1.Ack
-	4,  // 23: freelocker.v1.Agent.ReportMetrics:output_type -> freelocker.v1.Ack
-	2,  // 24: freelocker.v1.Agent.GetControls:output_type -> freelocker.v1.ControlsResponse
-	17, // [17:25] is the sub-list for method output_type
-	9,  // [9:17] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	1,  // 0: freelocker.v1.EventsRequest.events:type_name -> freelocker.v1.DeviceEvent
+	9,  // 1: freelocker.v1.ObserveRequest.apps:type_name -> freelocker.v1.ObservedApp
+	11, // 2: freelocker.v1.ReportBlocksRequest.events:type_name -> freelocker.v1.BlockEvent
+	13, // 3: freelocker.v1.EnrollRequest.hardware:type_name -> freelocker.v1.HardwareInfo
+	16, // 4: freelocker.v1.Heartbeat.inventory:type_name -> freelocker.v1.Inventory
+	17, // 5: freelocker.v1.AgentMessage.heartbeat:type_name -> freelocker.v1.Heartbeat
+	18, // 6: freelocker.v1.AgentMessage.command_result:type_name -> freelocker.v1.CommandResult
+	19, // 7: freelocker.v1.AgentMessage.goodbye:type_name -> freelocker.v1.Goodbye
+	0,  // 8: freelocker.v1.Command.type:type_name -> freelocker.v1.CommandType
+	22, // 9: freelocker.v1.ServerMessage.command:type_name -> freelocker.v1.SignedCommand
+	14, // 10: freelocker.v1.Enrollment.Enroll:input_type -> freelocker.v1.EnrollRequest
+	20, // 11: freelocker.v1.Agent.Connect:input_type -> freelocker.v1.AgentMessage
+	24, // 12: freelocker.v1.Agent.RenewCertificate:input_type -> freelocker.v1.RenewRequest
+	7,  // 13: freelocker.v1.Agent.GetPolicy:input_type -> freelocker.v1.GetPolicyRequest
+	10, // 14: freelocker.v1.Agent.Observe:input_type -> freelocker.v1.ObserveRequest
+	12, // 15: freelocker.v1.Agent.ReportBlocks:input_type -> freelocker.v1.ReportBlocksRequest
+	5,  // 16: freelocker.v1.Agent.ReportMetrics:input_type -> freelocker.v1.MetricsRequest
+	3,  // 17: freelocker.v1.Agent.GetControls:input_type -> freelocker.v1.GetControlsRequest
+	2,  // 18: freelocker.v1.Agent.ReportEvents:input_type -> freelocker.v1.EventsRequest
+	15, // 19: freelocker.v1.Enrollment.Enroll:output_type -> freelocker.v1.EnrollResponse
+	23, // 20: freelocker.v1.Agent.Connect:output_type -> freelocker.v1.ServerMessage
+	25, // 21: freelocker.v1.Agent.RenewCertificate:output_type -> freelocker.v1.RenewResponse
+	8,  // 22: freelocker.v1.Agent.GetPolicy:output_type -> freelocker.v1.GetPolicyResponse
+	6,  // 23: freelocker.v1.Agent.Observe:output_type -> freelocker.v1.Ack
+	6,  // 24: freelocker.v1.Agent.ReportBlocks:output_type -> freelocker.v1.Ack
+	6,  // 25: freelocker.v1.Agent.ReportMetrics:output_type -> freelocker.v1.Ack
+	4,  // 26: freelocker.v1.Agent.GetControls:output_type -> freelocker.v1.ControlsResponse
+	6,  // 27: freelocker.v1.Agent.ReportEvents:output_type -> freelocker.v1.Ack
+	19, // [19:28] is the sub-list for method output_type
+	10, // [10:19] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_freelocker_v1_agent_proto_init() }
@@ -1633,12 +1749,12 @@ func file_freelocker_v1_agent_proto_init() {
 	if File_freelocker_v1_agent_proto != nil {
 		return
 	}
-	file_freelocker_v1_agent_proto_msgTypes[17].OneofWrappers = []any{
+	file_freelocker_v1_agent_proto_msgTypes[19].OneofWrappers = []any{
 		(*AgentMessage_Heartbeat)(nil),
 		(*AgentMessage_CommandResult)(nil),
 		(*AgentMessage_Goodbye)(nil),
 	}
-	file_freelocker_v1_agent_proto_msgTypes[20].OneofWrappers = []any{
+	file_freelocker_v1_agent_proto_msgTypes[22].OneofWrappers = []any{
 		(*ServerMessage_Command)(nil),
 	}
 	type x struct{}
@@ -1647,7 +1763,7 @@ func file_freelocker_v1_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_freelocker_v1_agent_proto_rawDesc), len(file_freelocker_v1_agent_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   23,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

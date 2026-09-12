@@ -18,6 +18,17 @@ service Agent {
   rpc ReportBlocks(ReportBlocksRequest) returns (Ack);
   rpc ReportMetrics(MetricsRequest) returns (Ack);
   rpc GetControls(GetControlsRequest) returns (ControlsResponse);
+  rpc ReportEvents(EventsRequest) returns (Ack);
+}
+
+message DeviceEvent {
+  string kind = 1; // process_launch | logon
+  string summary = 2;
+  int64 at_unix = 3;
+}
+
+message EventsRequest {
+  repeated DeviceEvent events = 1;
 }
 
 message GetControlsRequest {}

@@ -10,6 +10,7 @@ const NAV = [
   { to: "/blocks", label: "Blocked programs" },
   { to: "/approvals", label: "Approvals" },
   { to: "/alerts", label: "Alerts" },
+  { to: "/activity", label: "Activity" },
   { to: "/tokens", label: "Install tokens" },
   { to: "/groups", label: "Groups" },
   { to: "/admins", label: "Admins" },

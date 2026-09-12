@@ -138,6 +138,21 @@ func (a *API) setControls(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (a *API) listDeviceEvents(w http.ResponseWriter, r *http.Request) {
+	events, err := a.Store.ListDeviceEvents(r.Context(), principalFrom(r).TenantID, r.URL.Query().Get("kind"), queryInt(r, "limit", 200, 1000))
+	if err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(events))
+	for _, e := range events {
+		out = append(out, map[string]any{
+			"id": e.ID, "device_id": e.DeviceID.String(), "kind": e.Kind, "summary": e.Summary, "at": e.At,
+		})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 func (a *API) listAlerts(w http.ResponseWriter, r *http.Request) {
 	alerts, err := a.Store.ListAlerts(r.Context(), principalFrom(r).TenantID, queryInt(r, "limit", 200, 1000))
 	if err != nil {

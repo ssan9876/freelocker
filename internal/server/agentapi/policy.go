@@ -98,6 +98,26 @@ func (s *agentService) GetControls(ctx context.Context, _ *flv1.GetControlsReque
 	}, nil
 }
 
+func (s *agentService) ReportEvents(ctx context.Context, req *flv1.EventsRequest) (*flv1.Ack, error) {
+	dev := deviceFrom(ctx)
+	evs := make([]store.DeviceEvent, 0, len(req.GetEvents()))
+	for _, e := range req.GetEvents() {
+		if e.GetKind() == "" {
+			continue
+		}
+		at := time.Unix(e.GetAtUnix(), 0)
+		if e.GetAtUnix() == 0 {
+			at = s.d.Now()
+		}
+		evs = append(evs, store.DeviceEvent{Kind: e.GetKind(), Summary: e.GetSummary(), At: at})
+	}
+	if err := s.d.Store.RecordDeviceEvents(ctx, dev.TenantID, dev.ID, evs); err != nil {
+		s.d.Log.Error("record device events", "device", dev.ID, "err", err)
+		return nil, status.Error(codes.Internal, "could not record events")
+	}
+	return &flv1.Ack{}, nil
+}
+
 func (s *agentService) ReportMetrics(ctx context.Context, req *flv1.MetricsRequest) (*flv1.Ack, error) {
 	dev := deviceFrom(ctx)
 	now := s.d.Now()

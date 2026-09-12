@@ -17,6 +17,7 @@ import (
 	"freelocker/internal/agent/config"
 	"freelocker/internal/agent/controls"
 	"freelocker/internal/agent/enforcer"
+	"freelocker/internal/agent/events"
 	"freelocker/internal/agent/executor"
 	"freelocker/internal/agent/identity"
 	"freelocker/internal/agent/inventory"
@@ -104,6 +105,7 @@ func runAgent(log *slog.Logger) error {
 	r.Executor = &executor.Executor{Actions: act, Log: log}
 	r.Enforcer = enforcer.Default(paths.DataDir)
 	r.Controls = controls.Default(cfg.ServerURL)
+	r.Events = events.NewReader()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()

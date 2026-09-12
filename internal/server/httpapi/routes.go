@@ -28,6 +28,7 @@ func (a *API) routes(r chi.Router) {
 	r.Get("/api/approvals/count", a.countApprovals)
 	r.Get("/api/alert-rules", a.listAlertRules)
 	r.Get("/api/alerts", a.listAlerts)
+	r.Get("/api/events", a.listDeviceEvents)
 	r.Get("/api/groups/{id}/controls", a.getControls)
 
 	r.Group(func(r chi.Router) {
