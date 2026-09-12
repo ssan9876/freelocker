@@ -3,15 +3,32 @@ package store
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
+type Tenant struct {
+	ID        uuid.UUID
+	Name      string
+	CreatedAt time.Time
+}
+
 func (s *Store) CreateTenant(ctx context.Context, name string) (uuid.UUID, error) {
 	id := uuid.New()
 	_, err := s.pool.Exec(ctx, `INSERT INTO tenants (id, name) VALUES ($1, $2)`, id, name)
 	return id, err
+}
+
+// ListTenantDetails returns every tenant with its name, oldest first. Used by
+// the provider tenant-management view.
+func (s *Store) ListTenantDetails(ctx context.Context) ([]Tenant, error) {
+	rows, _ := s.pool.Query(ctx, `SELECT id, name, created_at FROM tenants ORDER BY created_at`)
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Tenant, error) {
+		var t Tenant
+		return t, r.Scan(&t.ID, &t.Name, &t.CreatedAt)
+	})
 }
 
 // ListTenants returns all tenant ids, oldest first.

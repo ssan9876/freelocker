@@ -207,5 +207,7 @@ func (a *API) mfaVerify(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) me(w http.ResponseWriter, r *http.Request) {
 	p := principalFrom(r)
-	writeJSON(w, http.StatusOK, map[string]string{"id": p.Admin.ID.String(), "email": p.Admin.Email, "role": p.Admin.Role})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id": p.Admin.ID.String(), "email": p.Admin.Email, "role": p.Admin.Role, "provider": p.Admin.Provider,
+	})
 }

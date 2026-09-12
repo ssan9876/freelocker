@@ -17,18 +17,21 @@ import (
 	"freelocker/internal/server/httpapi"
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/keys"
+	"freelocker/internal/server/keyset"
 	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/store/storetest"
 
+	"github.com/google/uuid"
 	"github.com/pquerna/otp/totp"
 )
 
 type env struct {
-	srv   *httptest.Server
-	store *store.Store
-	hub   *hub.Hub
-	rt    func() *httpapi.Runtime
+	srv    *httptest.Server
+	store  *store.Store
+	hub    *hub.Hub
+	master []byte
+	rt     func() *httpapi.Runtime
 }
 
 const ownerEmail, ownerPass = "owner@example.com", "owner-password-123"
@@ -43,11 +46,12 @@ func newEnv(t *testing.T) *env {
 	h := hub.New()
 	var mu sync.Mutex
 	var rt *httpapi.Runtime
-	e := &env{store: s, hub: h}
+	e := &env{store: s, hub: h, master: master}
 	e.rt = func() *httpapi.Runtime { mu.Lock(); defer mu.Unlock(); return rt }
 
 	api := &httpapi.API{
 		Store: s, Hub: h, TOTPSealer: sealer, Sessions: &auth.Sessions{Store: s}, Runtime: e.rt, ReleaseDir: t.TempDir(),
+		KeyFor: keyset.New(s, master).For,
 		Setup: func(ctx context.Context, org, email, pw string) error {
 			if _, err := bootstrap.Init(ctx, s, master, org, time.Now()); err != nil {
 				return err
@@ -60,7 +64,8 @@ func newEnv(t *testing.T) *env {
 			if err != nil {
 				return err
 			}
-			if _, err := s.CreateAdmin(ctx, k.TenantID, store.Admin{Email: email, PasswordHash: hash, Role: "owner"}); err != nil {
+			// The setup owner is the provider, mirroring app.Initialize.
+			if _, err := s.CreateAdmin(ctx, k.TenantID, store.Admin{Email: email, PasswordHash: hash, Role: "owner", Provider: true}); err != nil {
 				return err
 			}
 			mu.Lock()
@@ -71,6 +76,20 @@ func newEnv(t *testing.T) *env {
 			}
 			mu.Unlock()
 			return nil
+		},
+		ProvisionTenant: func(ctx context.Context, org, ownerEmail, ownerPass string) (uuid.UUID, error) {
+			tid, err := bootstrap.ProvisionTenant(ctx, s, master, org, time.Now())
+			if err != nil {
+				return uuid.Nil, err
+			}
+			hash, err := auth.HashPassword(ownerPass)
+			if err != nil {
+				return uuid.Nil, err
+			}
+			if _, err := s.CreateAdmin(ctx, tid, store.Admin{Email: ownerEmail, PasswordHash: hash, Role: "owner"}); err != nil {
+				return uuid.Nil, err
+			}
+			return tid, nil
 		},
 	}
 	e.srv = httptest.NewServer(api.Handler())

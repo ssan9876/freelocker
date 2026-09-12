@@ -18,6 +18,7 @@ type Admin struct {
 	TOTPConfirmed bool
 	Role          string
 	Disabled      bool
+	Provider      bool
 	CreatedAt     time.Time
 }
 
@@ -32,11 +33,11 @@ type Session struct {
 	UserAgent string
 }
 
-const adminCols = `id, email, password_hash, totp_secret_enc, totp_confirmed, role, disabled, created_at`
+const adminCols = `id, email, password_hash, totp_secret_enc, totp_confirmed, role, disabled, provider, created_at`
 
 func scanAdmin(r pgx.Row) (Admin, error) {
 	var a Admin
-	err := r.Scan(&a.ID, &a.Email, &a.PasswordHash, &a.TOTPSecretEnc, &a.TOTPConfirmed, &a.Role, &a.Disabled, &a.CreatedAt)
+	err := r.Scan(&a.ID, &a.Email, &a.PasswordHash, &a.TOTPSecretEnc, &a.TOTPConfirmed, &a.Role, &a.Disabled, &a.Provider, &a.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -45,8 +46,8 @@ func scanAdmin(r pgx.Row) (Admin, error) {
 
 func (s *Store) CreateAdmin(ctx context.Context, tenantID uuid.UUID, a Admin) (uuid.UUID, error) {
 	id := uuid.New()
-	_, err := s.pool.Exec(ctx, `INSERT INTO admins (id, tenant_id, email, password_hash, role) VALUES ($1, $2, $3, $4, $5)`,
-		id, tenantID, strings.ToLower(a.Email), a.PasswordHash, a.Role)
+	_, err := s.pool.Exec(ctx, `INSERT INTO admins (id, tenant_id, email, password_hash, role, provider) VALUES ($1, $2, $3, $4, $5, $6)`,
+		id, tenantID, strings.ToLower(a.Email), a.PasswordHash, a.Role, a.Provider)
 	return id, conflict(err)
 }
 
@@ -66,7 +67,7 @@ func (s *Store) GetAdminByEmailGlobal(ctx context.Context, email string) (Admin,
 	var a Admin
 	var tid uuid.UUID
 	err := s.pool.QueryRow(ctx, `SELECT `+adminCols+`, tenant_id FROM admins WHERE email = $1`, strings.ToLower(email)).
-		Scan(&a.ID, &a.Email, &a.PasswordHash, &a.TOTPSecretEnc, &a.TOTPConfirmed, &a.Role, &a.Disabled, &a.CreatedAt, &tid)
+		Scan(&a.ID, &a.Email, &a.PasswordHash, &a.TOTPSecretEnc, &a.TOTPConfirmed, &a.Role, &a.Disabled, &a.Provider, &a.CreatedAt, &tid)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}

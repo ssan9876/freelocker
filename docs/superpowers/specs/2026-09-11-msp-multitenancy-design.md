@@ -81,10 +81,18 @@ with a provider-level super-admin who can create and switch between tenants.
   (global uniqueness + resolve-by-email) and
   `httpapi.TestLoginResolvesTenantFromEmail` (a second-tenant admin logs in with
   no hint and gets a tenant-B session; unknown email → 401).
-- **Phase 3 — provider tenant management.** `provider` owner flag; provider API
-  to create/list tenants (each with its own CA via `bootstrap.Init`); audit.
-  Test: provider creates tenant B, B's owner logs in, enrolls a device that gets
-  B's CA (not A's).
+- **Phase 3 — provider tenant management. DONE.** Migration `0013_provider.sql`
+  adds a `provider` flag to `admins`; the setup owner is the provider (the MSP
+  operator). New provider-only API (guarded by `requireProvider`): `POST
+  /api/provider/tenants` (`app.ProvisionTenant` → `bootstrap.ProvisionTenant`
+  creates the tenant with its own CA + keys, then its owner admin) and `GET
+  /api/provider/tenants` (`store.ListTenantDetails`). Actions are audited under
+  the provider's tenant (`provider.tenant.create`). `/api/me` now returns the
+  `provider` flag (for the Phase 4 console). Test:
+  `httpapi.TestProviderCreatesTenant` — a non-provider owner gets 403; the
+  provider creates tenant Beta; Beta's owner logs in with no hint and is an
+  owner but not a provider; Beta's CA differs from the default tenant's (so a
+  device enrolling into Beta trusts Beta's CA); a duplicate owner email → 409.
 - **Phase 4 — console provider view + tenant scoping.** UI to list tenants and
   manage one; ordinary admins unaffected.
 

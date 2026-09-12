@@ -60,6 +60,13 @@ func (a *API) routes(r chi.Router) {
 		r.Post("/api/admins/{id}/disable", a.disableAdmin)
 		r.Post("/api/releases", a.uploadRelease)
 	})
+
+	// Provider-only: manage tenants across the deployment (MSP operator).
+	r.Group(func(r chi.Router) {
+		r.Use(a.requireProvider)
+		r.Get("/api/provider/tenants", a.listProviderTenants)
+		r.Post("/api/provider/tenants", a.createProviderTenant)
+	})
 }
 
 func pathID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {

@@ -36,13 +36,16 @@ type Runtime struct {
 }
 
 type API struct {
-	Store      *store.Store
-	Runtime    func() *Runtime // nil until the server is initialized
-	Setup      func(ctx context.Context, org, email, password string) error
-	Hub        *hub.Hub
-	TOTPSealer *keys.Sealer
-	Sessions   *auth.Sessions
-	ReleaseDir string
+	Store   *store.Store
+	Runtime func() *Runtime // nil until the server is initialized
+	Setup   func(ctx context.Context, org, email, password string) error
+	// ProvisionTenant creates a tenant (own CA + keys) and its owner admin,
+	// returning the new tenant id. Used by the provider API.
+	ProvisionTenant func(ctx context.Context, org, ownerEmail, ownerPassword string) (uuid.UUID, error)
+	Hub             *hub.Hub
+	TOTPSealer      *keys.Sealer
+	Sessions        *auth.Sessions
+	ReleaseDir      string
 	// KeyFor resolves per-tenant keys; when nil the Runtime's single keys
 	// are used (single-tenant).
 	KeyFor keyset.Func

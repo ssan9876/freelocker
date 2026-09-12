@@ -81,7 +81,7 @@ func NewWithStore(cfg config.Config, s *store.Store, master []byte, log *slog.Lo
 	}
 	a := &App{cfg: cfg, store: s, master: master, log: log, hub: hub.New(), keyProvider: keyset.New(s, master)}
 	api := &httpapi.API{
-		Store: s, Runtime: a.runtime, Setup: a.setup, Hub: a.hub, TOTPSealer: totpSealer,
+		Store: s, Runtime: a.runtime, Setup: a.setup, ProvisionTenant: a.ProvisionTenant, Hub: a.hub, TOTPSealer: totpSealer,
 		Sessions: &auth.Sessions{Store: s, Secure: !cfg.InsecureCookies}, ReleaseDir: cfg.ReleaseDir,
 		KeyFor: a.keyProvider.For, Log: log,
 	}
@@ -138,7 +138,8 @@ func (a *App) Initialize(ctx context.Context, org, email, password string) (*boo
 	if err != nil {
 		return nil, err
 	}
-	if _, err := a.store.CreateAdmin(ctx, k.TenantID, store.Admin{Email: email, PasswordHash: hash, Role: "owner"}); err != nil {
+	// The first owner is the provider: the MSP operator who can create tenants.
+	if _, err := a.store.CreateAdmin(ctx, k.TenantID, store.Admin{Email: email, PasswordHash: hash, Role: "owner", Provider: true}); err != nil {
 		return nil, err
 	}
 	if err := a.store.AppendAudit(ctx, k.TenantID, store.AuditEntry{
@@ -147,6 +148,27 @@ func (a *App) Initialize(ctx context.Context, org, email, password string) (*boo
 		a.log.Error("audit write failed", "err", err)
 	}
 	return k, nil
+}
+
+// ProvisionTenant creates a new tenant with its own CA and keys, plus an owner
+// admin who can log in (email is globally unique). It returns the new tenant's
+// id. Intended for the provider tenant-management API.
+func (a *App) ProvisionTenant(ctx context.Context, org, ownerEmail, ownerPassword string) (uuid.UUID, error) {
+	if strings.TrimSpace(org) == "" || !strings.Contains(ownerEmail, "@") {
+		return uuid.Nil, errors.New("organization name and a valid owner email are required")
+	}
+	hash, err := auth.HashPassword(ownerPassword)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	tid, err := bootstrap.ProvisionTenant(ctx, a.store, a.master, org, time.Now())
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if _, err := a.store.CreateAdmin(ctx, tid, store.Admin{Email: ownerEmail, PasswordHash: hash, Role: "owner"}); err != nil {
+		return uuid.Nil, err
+	}
+	return tid, nil
 }
 
 func (a *App) CreateAdmin(ctx context.Context, email, password, role string) error {
