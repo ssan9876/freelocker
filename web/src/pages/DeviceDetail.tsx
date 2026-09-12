@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { api, ApiError, Command, DeviceDetail as Detail, Group, MetricSample, Observation, Policy } from "../api";
+import {
+  api,
+  ApiError,
+  Command,
+  ControlKey,
+  DeviceControlsView,
+  DeviceDetail as Detail,
+  Group,
+  MetricSample,
+  Observation,
+  Policy,
+} from "../api";
+import { useAuth } from "../auth";
 import { StatusDot } from "../components/StatusDot";
 import { Confirm } from "../components/Confirm";
 import { Sparkline } from "../components/Sparkline";
@@ -20,6 +32,12 @@ const COMMANDS: { type: string; label: string }[] = [
   { type: "update_agent", label: "Update agent" },
 ];
 
+const CONTROL_LABELS: { key: ControlKey; label: string }[] = [
+  { key: "usb_storage_blocked", label: "USB storage" },
+  { key: "network_blocked", label: "Network" },
+  { key: "elevation_blocked", label: "Elevation" },
+];
+
 export function DeviceDetail() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -30,6 +48,9 @@ export function DeviceDetail() {
   const [samples, setSamples] = useState<MetricSample[]>([]);
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const { me } = useAuth();
+  const canEdit = me?.role !== "readonly";
+  const [ctl, setCtl] = useState<DeviceControlsView | null>(null);
   const [promoteTo, setPromoteTo] = useState("");
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -39,6 +60,7 @@ export function DeviceDetail() {
     api.get<Command[]>(`/api/devices/${id}/commands?limit=25`).then(setCmds).catch(() => {});
     api.get<Observation[]>(`/api/devices/${id}/observations?limit=100`).then(setObs).catch(() => {});
     api.get<MetricSample[]>(`/api/devices/${id}/metrics?limit=120`).then(setSamples).catch(() => {});
+    api.get<DeviceControlsView>(`/api/devices/${id}/controls`).then(setCtl).catch(() => {});
   };
 
   useEffect(() => {
@@ -53,6 +75,18 @@ export function DeviceDetail() {
       load();
     } catch (e) {
       notify(e instanceof ApiError ? e.message : "Could not move device", "error");
+    }
+  };
+
+  const setOverride = async (key: ControlKey, value: "inherit" | "allow" | "block") => {
+    if (!ctl) return;
+    const next = { ...ctl.overrides, [key]: value === "inherit" ? null : value === "block" };
+    try {
+      await api.post(`/api/devices/${id}/controls`, next);
+      notify("Device controls updated");
+      load();
+    } catch (e) {
+      notify(e instanceof ApiError ? e.message : "Could not update controls", "error");
     }
   };
 
@@ -184,6 +218,63 @@ export function DeviceDetail() {
           )}
         </div>
       </div>
+
+      {ctl && (
+        <div className="panel" style={{ marginTop: 20 }}>
+          <h2>Device controls</h2>
+          <p className="who" style={{ marginTop: -8 }}>
+            Override this device's group. Inherit follows the group; Allow or Block applies to this device only.
+          </p>
+          <div className="table-wrap" style={{ border: "none" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Control</th>
+                  <th>Setting</th>
+                  <th>Effective</th>
+                </tr>
+              </thead>
+              <tbody>
+                {CONTROL_LABELS.map(({ key, label }) => {
+                  const o = ctl.overrides[key];
+                  const setting = o === null ? "inherit" : o ? "block" : "allow";
+                  const groupName = groups.find((g) => g.id === d.group_id)?.name;
+                  const inherited = `Inherits: ${ctl.group[key] ? "Blocked" : "Allowed"} (${
+                    groupName ? `group ${groupName}` : "no group"
+                  })`;
+                  return (
+                    <tr key={key}>
+                      <td>{label}</td>
+                      <td>
+                        {canEdit ? (
+                          <select
+                            aria-label={`${label} override`}
+                            value={setting}
+                            onChange={(e) => setOverride(key, e.target.value as "inherit" | "allow" | "block")}
+                          >
+                            <option value="inherit">{inherited}</option>
+                            <option value="allow">Allow</option>
+                            <option value="block">Block</option>
+                          </select>
+                        ) : setting === "inherit" ? (
+                          inherited
+                        ) : (
+                          setting
+                        )}
+                      </td>
+                      <td>
+                        <span className={`badge ${ctl.effective[key] ? "fail" : "ok"}`}>
+                          {ctl.effective[key] ? "Blocked" : "Allowed"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="panel" style={{ marginTop: 20 }}>
         <h2>Recent commands</h2>

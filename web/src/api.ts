@@ -73,6 +73,12 @@ export type Device = {
   enrolled_at: string;
 };
 export type DeviceDetail = { device: Device; uninstall_code?: string };
+export type ControlKey = "usb_storage_blocked" | "network_blocked" | "elevation_blocked";
+export type DeviceControlsView = {
+  overrides: Record<ControlKey, boolean | null>;
+  group: Record<ControlKey, boolean>;
+  effective: Record<ControlKey, boolean>;
+};
 export type Command = {
   id: string;
   type: string;
