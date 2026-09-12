@@ -31,6 +31,31 @@ func (s *Store) CreateDeviceGroup(ctx context.Context, tenantID uuid.UUID, name 
 	return id, conflict(err)
 }
 
+func (s *Store) RenameDeviceGroup(ctx context.Context, tenantID, id uuid.UUID, name string) error {
+	tag, err := s.pool.Exec(ctx, `UPDATE device_groups SET name = $3 WHERE tenant_id = $1 AND id = $2`, tenantID, id, name)
+	return oneRow(tag, conflict(err))
+}
+
+// DeleteDeviceGroup removes a group. Its devices and install tokens become
+// ungrouped; policy assignments and controls cascade with the group.
+func (s *Store) DeleteDeviceGroup(ctx context.Context, tenantID, id uuid.UUID) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `UPDATE devices SET group_id = NULL WHERE tenant_id = $1 AND group_id = $2`, tenantID, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE install_tokens SET group_id = NULL WHERE tenant_id = $1 AND group_id = $2`, tenantID, id); err != nil {
+		return err
+	}
+	if err := oneRow(tx.Exec(ctx, `DELETE FROM device_groups WHERE tenant_id = $1 AND id = $2`, tenantID, id)); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (s *Store) ListDeviceGroups(ctx context.Context, tenantID uuid.UUID) ([]DeviceGroup, error) {
 	rows, _ := s.pool.Query(ctx, `SELECT id, name FROM device_groups WHERE tenant_id = $1 ORDER BY name`, tenantID)
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (DeviceGroup, error) {

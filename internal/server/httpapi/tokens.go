@@ -46,6 +46,70 @@ func (a *API) createGroup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]string{"id": id.String()})
 }
 
+func (a *API) renameGroup(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		writeErr(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	p := principalFrom(r)
+	if err := a.Store.RenameDeviceGroup(r.Context(), p.TenantID, id, name); err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	a.audit(r, p, "group.rename", "group", id.String(), map[string]any{"name": name}, "success")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteGroup removes a group; its devices and tokens become ungrouped and
+// lose the group's policy assignments and controls.
+func (a *API) deleteGroup(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	p := principalFrom(r)
+	if err := a.Store.DeleteDeviceGroup(r.Context(), p.TenantID, id); err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	a.audit(r, p, "group.delete", "group", id.String(), nil, "success")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// setDeviceGroup moves a device into a group (or out of all groups with a
+// null group_id). The agent picks up the new effective policy and controls on
+// its next poll.
+func (a *API) setDeviceGroup(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		GroupID *uuid.UUID `json:"group_id"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	p := principalFrom(r)
+	if err := a.Store.SetDeviceGroup(r.Context(), p.TenantID, id, req.GroupID); err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	a.audit(r, p, "device.group", "device", id.String(), map[string]any{"group_id": req.GroupID}, "success")
+	w.WriteHeader(http.StatusNoContent)
+}
+
 type tokenJSON struct {
 	ID        string     `json:"id"`
 	Name      string     `json:"name"`

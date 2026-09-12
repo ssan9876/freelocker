@@ -36,6 +36,10 @@ func (a *API) routes(r chi.Router) {
 		r.Post("/api/devices/{id}/revoke", a.revokeDevice)
 		r.Post("/api/devices/{id}/commands", a.issueCommand)
 		r.Post("/api/groups", a.createGroup)
+		r.Patch("/api/groups/{id}", a.renameGroup)
+		r.Delete("/api/groups/{id}", a.deleteGroup)
+		r.Post("/api/devices/{id}/group", a.setDeviceGroup)
+		r.Patch("/api/alert-rules/{id}", a.updateAlertRule)
 		r.Post("/api/tokens", a.createToken)
 		r.Post("/api/tokens/{id}/revoke", a.revokeToken)
 		r.Post("/api/policies", a.createPolicy)
@@ -58,6 +62,8 @@ func (a *API) routes(r chi.Router) {
 		r.Get("/api/admins", a.listAdmins)
 		r.Post("/api/admins", a.createAdmin)
 		r.Post("/api/admins/{id}/disable", a.disableAdmin)
+		r.Post("/api/admins/{id}/enable", a.enableAdmin)
+		r.Post("/api/admins/{id}/role", a.setAdminRole)
 		r.Post("/api/releases", a.uploadRelease)
 	})
 
@@ -66,6 +72,7 @@ func (a *API) routes(r chi.Router) {
 		r.Use(a.requireProvider)
 		r.Get("/api/provider/tenants", a.listProviderTenants)
 		r.Post("/api/provider/tenants", a.createProviderTenant)
+		r.Patch("/api/provider/tenants/{id}", a.updateProviderTenant)
 	})
 }
 

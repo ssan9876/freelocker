@@ -33,7 +33,7 @@ func (a *API) withSession(requireMFA bool) func(http.Handler) http.Handler {
 				return
 			}
 			admin, err := a.Store.GetAdmin(r.Context(), sess.TenantID, sess.AdminID)
-			if err != nil || admin.Disabled {
+			if err != nil || admin.Disabled || a.tenantSuspended(r.Context(), sess.TenantID) {
 				writeErr(w, http.StatusUnauthorized, "not logged in")
 				return
 			}
@@ -50,6 +50,13 @@ func (a *API) withSession(requireMFA bool) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, p)))
 		})
 	}
+}
+
+// tenantSuspended reports whether a tenant is suspended; a lookup failure is
+// treated as suspended so auth fails closed.
+func (a *API) tenantSuspended(ctx context.Context, tenantID uuid.UUID) bool {
+	sus, err := a.Store.TenantSuspended(ctx, tenantID)
+	return err != nil || sus
 }
 
 func (a *API) requireRole(role string) func(http.Handler) http.Handler {
@@ -122,8 +129,9 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A suspended tenant's admins fail exactly like a wrong password.
 	var hash *string
-	if err == nil && !admin.Disabled {
+	if err == nil && !admin.Disabled && !a.tenantSuspended(r.Context(), tenant) {
 		hash = &admin.PasswordHash
 	}
 	if !auth.CheckPasswordOrDummy(hash, req.Password) {

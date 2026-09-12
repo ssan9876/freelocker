@@ -83,3 +83,47 @@ func (a *API) disableAdmin(w http.ResponseWriter, r *http.Request) {
 	a.audit(r, p, "admin.disable", "admin", id.String(), nil, "success")
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (a *API) enableAdmin(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	p := principalFrom(r)
+	if err := a.Store.SetAdminDisabled(r.Context(), p.TenantID, id, false); err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	a.audit(r, p, "admin.enable", "admin", id.String(), nil, "success")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// setAdminRole changes another admin's role. Changing your own role is
+// refused; since only owners reach this, an active owner always remains.
+func (a *API) setAdminRole(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Role string `json:"role"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	p := principalFrom(r)
+	if id == p.Admin.ID {
+		writeErr(w, http.StatusBadRequest, "cannot change your own role")
+		return
+	}
+	if !slices.Contains(auth.Roles, req.Role) {
+		writeErr(w, http.StatusBadRequest, "role must be owner, admin, or readonly")
+		return
+	}
+	if err := a.Store.SetAdminRole(r.Context(), p.TenantID, id, req.Role); err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	a.audit(r, p, "admin.role", "admin", id.String(), map[string]any{"role": req.Role}, "success")
+	w.WriteHeader(http.StatusNoContent)
+}

@@ -55,6 +55,15 @@ func (d Deps) authenticate(ctx context.Context) (context.Context, error) {
 	case serial != leaf.SerialNumber.Text(16):
 		return nil, status.Error(codes.Unauthenticated, "certificate superseded")
 	}
+	// A suspended tenant's devices keep their identity (they retry and resume
+	// on unsuspend) but are refused service meanwhile.
+	suspended, err := d.Store.TenantSuspended(ctx, tenantID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "auth lookup failed")
+	}
+	if suspended {
+		return nil, status.Error(codes.PermissionDenied, "tenant suspended")
+	}
 	return context.WithValue(ctx, deviceKey{}, device{ID: id, TenantID: tenantID}), nil
 }
 

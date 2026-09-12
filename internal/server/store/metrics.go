@@ -86,6 +86,24 @@ func (s *Store) ListEnabledAlertRules(ctx context.Context, tenantID uuid.UUID) (
 	return out, nil
 }
 
+// UpdateAlertRule replaces a rule's editable fields. Stored breach onsets for
+// the rule are cleared, since they were measured against the old definition.
+func (s *Store) UpdateAlertRule(ctx context.Context, tenantID uuid.UUID, r AlertRule) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err := oneRow(tx.Exec(ctx, `UPDATE alert_rules SET name=$3, metric=$4, op=$5, threshold=$6, duration_seconds=$7, enabled=$8
+		WHERE tenant_id=$1 AND id=$2`, tenantID, r.ID, r.Name, r.Metric, r.Op, r.Threshold, r.DurationSeconds, r.Enabled)); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM alert_breaches WHERE tenant_id=$1 AND rule_id=$2`, tenantID, r.ID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (s *Store) DeleteAlertRule(ctx context.Context, tenantID, id uuid.UUID) error {
 	return oneRow(s.pool.Exec(ctx, `DELETE FROM alert_rules WHERE tenant_id=$1 AND id=$2`, tenantID, id))
 }

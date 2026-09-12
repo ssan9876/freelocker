@@ -88,6 +88,10 @@ func (s *Store) SetAdminDisabled(ctx context.Context, tenantID, id uuid.UUID, di
 	return oneRow(s.pool.Exec(ctx, `UPDATE admins SET disabled = $3 WHERE tenant_id = $1 AND id = $2`, tenantID, id, disabled))
 }
 
+func (s *Store) SetAdminRole(ctx context.Context, tenantID, id uuid.UUID, role string) error {
+	return oneRow(s.pool.Exec(ctx, `UPDATE admins SET role = $3 WHERE tenant_id = $1 AND id = $2`, tenantID, id, role))
+}
+
 func (s *Store) CreateSession(ctx context.Context, sess Session) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO sessions (id, tenant_id, admin_id, csrf_token, mfa_passed, expires_at, ip, user_agent)

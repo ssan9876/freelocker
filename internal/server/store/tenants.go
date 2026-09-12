@@ -12,6 +12,7 @@ import (
 type Tenant struct {
 	ID        uuid.UUID
 	Name      string
+	Suspended bool
 	CreatedAt time.Time
 }
 
@@ -24,11 +25,43 @@ func (s *Store) CreateTenant(ctx context.Context, name string) (uuid.UUID, error
 // ListTenantDetails returns every tenant with its name, oldest first. Used by
 // the provider tenant-management view.
 func (s *Store) ListTenantDetails(ctx context.Context) ([]Tenant, error) {
-	rows, _ := s.pool.Query(ctx, `SELECT id, name, created_at FROM tenants ORDER BY created_at`)
+	rows, _ := s.pool.Query(ctx, `SELECT id, name, suspended, created_at FROM tenants ORDER BY created_at`)
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Tenant, error) {
 		var t Tenant
-		return t, r.Scan(&t.ID, &t.Name, &t.CreatedAt)
+		return t, r.Scan(&t.ID, &t.Name, &t.Suspended, &t.CreatedAt)
 	})
+}
+
+func (s *Store) RenameTenant(ctx context.Context, id uuid.UUID, name string) error {
+	return oneRow(s.pool.Exec(ctx, `UPDATE tenants SET name = $2 WHERE id = $1`, id, name))
+}
+
+// SetTenantSuspended suspends or restores a tenant. Suspending also deletes
+// the tenant's console sessions so its admins are signed out immediately.
+func (s *Store) SetTenantSuspended(ctx context.Context, id uuid.UUID, suspended bool) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err := oneRow(tx.Exec(ctx, `UPDATE tenants SET suspended = $2 WHERE id = $1`, id, suspended)); err != nil {
+		return err
+	}
+	if suspended {
+		if _, err := tx.Exec(ctx, `DELETE FROM sessions WHERE tenant_id = $1`, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+func (s *Store) TenantSuspended(ctx context.Context, id uuid.UUID) (bool, error) {
+	var sus bool
+	err := s.pool.QueryRow(ctx, `SELECT suspended FROM tenants WHERE id = $1`, id).Scan(&sus)
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = ErrNotFound
+	}
+	return sus, err
 }
 
 // ListTenants returns all tenant ids, oldest first.

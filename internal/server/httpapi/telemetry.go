@@ -58,22 +58,59 @@ func (a *API) createAlertRule(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &req) {
 		return
 	}
-	req.Name = strings.TrimSpace(req.Name)
-	if req.Name == "" || (req.Metric != "cpu" && req.Metric != "mem" && req.Metric != "disk") ||
-		(req.Op != "gt" && req.Op != "lt") || req.Threshold < 0 || req.Threshold > 100 || req.DurationSeconds < 0 {
-		writeErr(w, http.StatusBadRequest, "name, metric (cpu|mem|disk), op (gt|lt), threshold 0-100, and non-negative duration are required")
+	rule := store.AlertRule{Name: strings.TrimSpace(req.Name), Metric: req.Metric, Op: req.Op,
+		Threshold: req.Threshold, DurationSeconds: req.DurationSeconds, Enabled: true}
+	if !validAlertRule(w, rule) {
 		return
 	}
 	p := principalFrom(r)
-	id, err := a.Store.CreateAlertRule(r.Context(), p.TenantID, store.AlertRule{
-		Name: req.Name, Metric: req.Metric, Op: req.Op, Threshold: req.Threshold, DurationSeconds: req.DurationSeconds, Enabled: true,
-	})
+	id, err := a.Store.CreateAlertRule(r.Context(), p.TenantID, rule)
 	if err != nil {
 		a.storeErr(w, err)
 		return
 	}
 	a.audit(r, p, "alert_rule.create", "alert_rule", id.String(), map[string]any{"metric": req.Metric, "op": req.Op, "threshold": req.Threshold}, "success")
 	writeJSON(w, http.StatusCreated, map[string]string{"id": id.String()})
+}
+
+func validAlertRule(w http.ResponseWriter, r store.AlertRule) bool {
+	if r.Name == "" || (r.Metric != "cpu" && r.Metric != "mem" && r.Metric != "disk") ||
+		(r.Op != "gt" && r.Op != "lt") || r.Threshold < 0 || r.Threshold > 100 || r.DurationSeconds < 0 {
+		writeErr(w, http.StatusBadRequest, "name, metric (cpu|mem|disk), op (gt|lt), threshold 0-100, and non-negative duration are required")
+		return false
+	}
+	return true
+}
+
+func (a *API) updateAlertRule(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Name            string  `json:"name"`
+		Metric          string  `json:"metric"`
+		Op              string  `json:"op"`
+		Threshold       float64 `json:"threshold"`
+		DurationSeconds int     `json:"duration_seconds"`
+		Enabled         bool    `json:"enabled"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	rule := store.AlertRule{ID: id, Name: strings.TrimSpace(req.Name), Metric: req.Metric, Op: req.Op,
+		Threshold: req.Threshold, DurationSeconds: req.DurationSeconds, Enabled: req.Enabled}
+	if !validAlertRule(w, rule) {
+		return
+	}
+	p := principalFrom(r)
+	if err := a.Store.UpdateAlertRule(r.Context(), p.TenantID, rule); err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	a.audit(r, p, "alert_rule.update", "alert_rule", id.String(),
+		map[string]any{"metric": rule.Metric, "op": rule.Op, "threshold": rule.Threshold, "enabled": rule.Enabled}, "success")
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *API) deleteAlertRule(w http.ResponseWriter, r *http.Request) {

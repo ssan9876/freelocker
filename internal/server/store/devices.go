@@ -92,18 +92,22 @@ func (s *Store) EnrollDevice(ctx context.Context, tokenHash []byte, now time.Tim
 		maxUses           *int
 		uses              int
 		revoked           bool
+		suspended         bool
 	)
 	err = tx.QueryRow(ctx, `
-		SELECT id, tenant_id, group_id, expires_at, max_uses, uses, revoked
-		FROM install_tokens WHERE token_hash = $1 FOR UPDATE`, tokenHash).
-		Scan(&tokenID, &tenantID, &groupID, &expiresAt, &maxUses, &uses, &revoked)
+		SELECT it.id, it.tenant_id, it.group_id, it.expires_at, it.max_uses, it.uses, it.revoked, t.suspended
+		FROM install_tokens it JOIN tenants t ON t.id = it.tenant_id
+		WHERE it.token_hash = $1 FOR UPDATE OF it`, tokenHash).
+		Scan(&tokenID, &tenantID, &groupID, &expiresAt, &maxUses, &uses, &revoked, &suspended)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, ErrTokenInvalid
 	}
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if revoked || (expiresAt != nil && !now.Before(*expiresAt)) || (maxUses != nil && uses >= *maxUses) {
+	// A suspended tenant's tokens are treated as invalid (no distinct error, so
+	// the enrolling party learns nothing about the tenant's state).
+	if suspended || revoked || (expiresAt != nil && !now.Before(*expiresAt)) || (maxUses != nil && uses >= *maxUses) {
 		return uuid.Nil, ErrTokenInvalid
 	}
 
@@ -130,6 +134,16 @@ func (s *Store) GetDevice(ctx context.Context, tenantID, id uuid.UUID) (Device, 
 func (s *Store) ListDevices(ctx context.Context, tenantID uuid.UUID) ([]Device, error) {
 	rows, _ := s.pool.Query(ctx, `SELECT `+deviceCols+` FROM devices WHERE tenant_id = $1 ORDER BY hostname`, tenantID)
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Device, error) { return scanDevice(r) })
+}
+
+// SetDeviceGroup moves a device into a group of the same tenant, or ungroups
+// it when groupID is nil. ErrNotFound when the device or group is not in the
+// tenant.
+func (s *Store) SetDeviceGroup(ctx context.Context, tenantID, id uuid.UUID, groupID *uuid.UUID) error {
+	return oneRow(s.pool.Exec(ctx, `
+		UPDATE devices SET group_id = $3 WHERE tenant_id = $1 AND id = $2
+		AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM device_groups WHERE tenant_id = $1 AND id = $3))`,
+		tenantID, id, groupID))
 }
 
 func (s *Store) DeviceAuthState(ctx context.Context, id uuid.UUID) (uuid.UUID, string, bool, error) {
