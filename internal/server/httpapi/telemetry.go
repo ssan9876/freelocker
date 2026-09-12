@@ -175,6 +175,80 @@ func (a *API) setControls(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func overridesJSON(o store.DeviceControlOverrides) map[string]*bool {
+	return map[string]*bool{
+		"usb_storage_blocked": o.USBStorageBlocked,
+		"network_blocked":     o.NetworkBlocked,
+		"elevation_blocked":   o.ElevationBlocked,
+	}
+}
+
+// getDeviceControls returns a device's overrides alongside its group's
+// controls and the effective result, so the console can show where each
+// value comes from.
+func (a *API) getDeviceControls(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	ctx, tenant := r.Context(), principalFrom(r).TenantID
+	o, err := a.Store.GetDeviceOverrides(ctx, tenant, id)
+	if err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	d, err := a.Store.GetDevice(ctx, tenant, id)
+	if err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	var group store.DeviceControls
+	if d.GroupID != nil {
+		group, err = a.Store.GetControls(ctx, tenant, *d.GroupID)
+		if err != nil && err != store.ErrNotFound {
+			a.storeErr(w, err)
+			return
+		}
+	}
+	eff, err := a.Store.EffectiveControlsForDevice(ctx, tenant, id)
+	if err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"overrides": overridesJSON(o), "group": controlsJSON(group), "effective": controlsJSON(eff),
+	})
+}
+
+// setDeviceControls sets a device's overrides; null for a control means
+// inherit from the group.
+func (a *API) setDeviceControls(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		USBStorageBlocked *bool `json:"usb_storage_blocked"`
+		NetworkBlocked    *bool `json:"network_blocked"`
+		ElevationBlocked  *bool `json:"elevation_blocked"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	o := store.DeviceControlOverrides{USBStorageBlocked: req.USBStorageBlocked, NetworkBlocked: req.NetworkBlocked, ElevationBlocked: req.ElevationBlocked}
+	p := principalFrom(r)
+	if err := a.Store.SetDeviceOverrides(r.Context(), p.TenantID, id, o); err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	detail := map[string]any{}
+	for k, v := range overridesJSON(o) {
+		detail[k] = v
+	}
+	a.audit(r, p, "device.controls", "device", id.String(), detail, "success")
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (a *API) listDeviceEvents(w http.ResponseWriter, r *http.Request) {
 	events, err := a.Store.ListDeviceEvents(r.Context(), principalFrom(r).TenantID, r.URL.Query().Get("kind"), queryInt(r, "limit", 200, 1000))
 	if err != nil {
