@@ -244,6 +244,7 @@ func (a *API) listObservations(w http.ResponseWriter, r *http.Request) {
 	for _, o := range obs {
 		out = append(out, map[string]any{
 			"sha256": o.SHA256, "path": o.Path, "signer": o.Signer,
+			"signer_tbs": o.SignerTBS, "signer_verified": o.SignerVerified,
 			"count": o.Count, "first_seen": o.FirstSeen, "last_seen": o.LastSeen,
 		})
 	}
@@ -254,6 +255,7 @@ func (a *API) promoteObservation(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		PolicyID    string `json:"policy_id"`
 		SHA256      string `json:"sha256"`
+		Kind        string `json:"kind"` // "" or "hash" (default), or "publisher"
 		Description string `json:"description"`
 	}
 	if !readJSON(w, r, &req) {
@@ -264,27 +266,48 @@ func (a *API) promoteObservation(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid policy_id")
 		return
 	}
-	norm, err := rules.Normalize(rules.Rule{Kind: rules.Hash, Value: req.SHA256, Description: req.Description})
+	p := principalFrom(r)
+	rule := rules.Rule{Kind: rules.Hash, Value: req.SHA256, Description: req.Description}
+	switch req.Kind {
+	case "", "hash":
+	case "publisher":
+		// The TBS hash comes from the stored observation, never the request,
+		// so a client cannot claim a publisher was verified.
+		tbs, name, verified, err := a.Store.ObservationPublisher(r.Context(), p.TenantID, req.SHA256)
+		if err != nil {
+			a.storeErr(w, err)
+			return
+		}
+		if tbs == "" || !verified {
+			writeErr(w, http.StatusBadRequest, "this program has no verified publisher; allow it by hash instead")
+			return
+		}
+		rule = rules.Rule{Kind: rules.Publisher, Value: tbs, PublisherName: name, Description: req.Description}
+	default:
+		writeErr(w, http.StatusBadRequest, "kind must be hash or publisher")
+		return
+	}
+	norm, err := rules.Normalize(rule)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	p := principalFrom(r)
-	version, err := a.addHashRule(r.Context(), p, pid, norm)
+	version, err := a.addPolicyRule(r.Context(), p, pid, norm)
 	if err != nil {
 		a.storeErr(w, err)
 		return
 	}
-	a.audit(r, p, "policy.add_rule", "policy", pid.String(), map[string]any{"kind": "hash", "value": norm.Value, "via": "learning"}, "success")
+	a.audit(r, p, "policy.add_rule", "policy", pid.String(),
+		map[string]any{"kind": string(norm.Kind), "value": norm.Value, "via": "learning"}, "success")
 	writeJSON(w, http.StatusCreated, map[string]string{"version": version})
 }
 
-// addHashRule adds a normalized hash allow rule to a policy and recompiles
-// it, returning the new version. An identical rule already on the policy is
-// not an error, so retrying is safe.
-func (a *API) addHashRule(ctx context.Context, p principal, policyID uuid.UUID, rule rules.Rule) (string, error) {
+// addPolicyRule adds a normalized allow rule (hash, path or publisher) to a
+// policy and recompiles it, returning the new version. An identical rule
+// already on the policy is not an error, so retrying is safe.
+func (a *API) addPolicyRule(ctx context.Context, p principal, policyID uuid.UUID, rule rules.Rule) (string, error) {
 	_, err := a.Store.AddRule(ctx, p.TenantID, policyID, store.PolicyRule{
-		Kind: string(rule.Kind), Value: rule.Value, Description: rule.Description,
+		Kind: string(rule.Kind), Value: rule.Value, PublisherName: rule.PublisherName, Description: rule.Description,
 	}, &p.Admin.ID)
 	if err != nil && !errors.Is(err, store.ErrConflict) {
 		return "", err
@@ -302,7 +325,8 @@ func (a *API) listBlocks(w http.ResponseWriter, r *http.Request) {
 	for _, e := range events {
 		out = append(out, map[string]any{
 			"id": e.ID, "device_id": e.DeviceID.String(), "sha256": e.SHA256, "path": e.Path,
-			"signer": e.Signer, "blocked": e.Blocked, "at": e.At,
+			"signer": e.Signer, "signer_tbs": e.SignerTBS, "signer_verified": e.SignerVerified,
+			"blocked": e.Blocked, "at": e.At,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)

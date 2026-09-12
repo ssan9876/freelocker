@@ -11,18 +11,20 @@ import (
 )
 
 type approvalJSON struct {
-	ID          string     `json:"id"`
-	PolicyID    string     `json:"policy_id"`
-	PolicyName  string     `json:"policy_name"`
-	SHA256      string     `json:"sha256"`
-	Path        string     `json:"path"`
-	Signer      string     `json:"signer"`
-	Status      string     `json:"status"`
-	DeviceCount int        `json:"device_count"`
-	EventCount  int64      `json:"event_count"`
-	FirstSeen   time.Time  `json:"first_seen"`
-	LastSeen    time.Time  `json:"last_seen"`
-	DecidedAt   *time.Time `json:"decided_at"`
+	ID             string     `json:"id"`
+	PolicyID       string     `json:"policy_id"`
+	PolicyName     string     `json:"policy_name"`
+	SHA256         string     `json:"sha256"`
+	Path           string     `json:"path"`
+	Signer         string     `json:"signer"`
+	SignerTBS      string     `json:"signer_tbs"`
+	SignerVerified bool       `json:"signer_verified"`
+	Status         string     `json:"status"`
+	DeviceCount    int        `json:"device_count"`
+	EventCount     int64      `json:"event_count"`
+	FirstSeen      time.Time  `json:"first_seen"`
+	LastSeen       time.Time  `json:"last_seen"`
+	DecidedAt      *time.Time `json:"decided_at"`
 }
 
 func (a *API) listApprovals(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +44,8 @@ func (a *API) listApprovals(w http.ResponseWriter, r *http.Request) {
 	for _, q := range reqs {
 		out = append(out, approvalJSON{
 			ID: q.ID.String(), PolicyID: q.PolicyID.String(), PolicyName: q.PolicyName,
-			SHA256: q.SHA256, Path: q.Path, Signer: q.Signer, Status: q.Status,
+			SHA256: q.SHA256, Path: q.Path, Signer: q.Signer,
+			SignerTBS: q.SignerTBS, SignerVerified: q.SignerVerified, Status: q.Status,
 			DeviceCount: q.DeviceCount, EventCount: q.EventCount,
 			FirstSeen: q.FirstSeen, LastSeen: q.LastSeen, DecidedAt: q.DecidedAt,
 		})
@@ -67,9 +70,10 @@ func (a *API) denyApproval(w http.ResponseWriter, r *http.Request) {
 	a.decideApproval(w, r, "denied")
 }
 
-// decideApproval resolves a pending request. Approving first adds the hash
-// as an allow rule on the request's policy; if that fails the request stays
-// pending and can be retried.
+// decideApproval resolves a pending request. Approving first adds an allow
+// rule to the request's policy — by hash, path or publisher, per the optional
+// "kind" body field; if that fails the request stays pending and can be
+// retried.
 func (a *API) decideApproval(w http.ResponseWriter, r *http.Request, status string) {
 	id, ok := pathID(w, r)
 	if !ok {
@@ -85,34 +89,45 @@ func (a *API) decideApproval(w http.ResponseWriter, r *http.Request, status stri
 		writeErr(w, http.StatusConflict, "request already decided")
 		return
 	}
+	kind := rules.Hash
 	if status == "approved" {
-		// Approve as a hash rule (default) or, when a path is known, a path
-		// rule. Publisher approval needs the certificate TBS hash, which
-		// block events don't carry, so it isn't offered here.
-		kind := rules.Hash
-		value := req.SHA256
+		// Approve as a hash rule (default), a path rule when a path is known,
+		// or a publisher rule when the agent reported a signature Windows
+		// verified — a publisher rule survives the application updating.
+		value, publisher := req.SHA256, ""
 		if r.Body != nil {
 			var body struct {
 				Kind string `json:"kind"`
 			}
 			_ = readJSONOptional(r, &body)
-			if body.Kind == "path" {
+			switch body.Kind {
+			case "", "hash":
+			case "path":
 				if req.Path == "" {
 					writeErr(w, http.StatusBadRequest, "cannot approve by path: this request has no path")
 					return
 				}
 				kind, value = rules.Path, req.Path
+			case "publisher":
+				if req.SignerTBS == "" || !req.SignerVerified {
+					writeErr(w, http.StatusBadRequest, "cannot approve by publisher: no verified signature for this program")
+					return
+				}
+				kind, value, publisher = rules.Publisher, req.SignerTBS, req.Signer
+			default:
+				writeErr(w, http.StatusBadRequest, "kind must be hash, path, or publisher")
+				return
 			}
 		}
 		norm, err := rules.Normalize(rules.Rule{
-			Kind: kind, Value: value,
+			Kind: kind, Value: value, PublisherName: publisher,
 			Description: fmt.Sprintf("approved from request %s (%s)", req.ID, req.Path),
 		})
 		if err != nil {
 			writeErr(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		if _, err := a.addHashRule(r.Context(), p, req.PolicyID, norm); err != nil {
+		if _, err := a.addPolicyRule(r.Context(), p, req.PolicyID, norm); err != nil {
 			a.storeErr(w, err)
 			return
 		}
@@ -130,8 +145,10 @@ func (a *API) decideApproval(w http.ResponseWriter, r *http.Request, status stri
 	if status == "denied" {
 		action = "approval.deny"
 	}
-	a.audit(r, p, action, "approval", id.String(), map[string]any{
-		"policy_id": req.PolicyID.String(), "sha256": req.SHA256,
-	}, "success")
+	detail := map[string]any{"policy_id": req.PolicyID.String(), "sha256": req.SHA256}
+	if status == "approved" {
+		detail["kind"] = string(kind)
+	}
+	a.audit(r, p, action, "approval", id.String(), detail, "success")
 	w.WriteHeader(http.StatusNoContent)
 }
