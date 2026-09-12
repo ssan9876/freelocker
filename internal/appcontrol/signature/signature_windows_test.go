@@ -9,10 +9,11 @@ import (
 )
 
 // TestFromFileVerifiesSystemBinary reads a Microsoft-signed system binary.
-// Read-only and safe on a dev box. Skips when the file has no embedded
-// signature (some builds ship catalog-signed binaries only).
+// Read-only and safe on a dev box. explorer.exe carries an embedded
+// signature; many System32 binaries (notepad.exe, for one) are catalog-signed
+// only and would have nothing to verify here.
 func TestFromFileVerifiesSystemBinary(t *testing.T) {
-	const path = `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
+	const path = `C:\Windows\explorer.exe`
 	info, err := FromFile(path)
 	if err != nil {
 		t.Fatalf("FromFile(%s): %v", path, err)
