@@ -70,10 +70,17 @@ with a provider-level super-admin who can create and switch between tenants.
   proves two tenants each enroll and `GetPolicy` over one server via SNI, that
   each device is bound to its own tenant, and that tenant A's cert cannot ride
   tenant B's SNI + roots.
-- **Phase 2 — global-email login.** Add the global-unique-email migration and
-  `GetAdminByEmailGlobal`; login resolves tenant from the admin. Test: two
-  tenants, an admin in each, each logs into their own tenant; duplicate email
-  across tenants is rejected at creation.
+- **Phase 2 — global-email login. DONE.** Migration `0012_global_email.sql`
+  adds a global unique index on `admins(email)`; `store.GetAdminByEmailGlobal`
+  returns an admin and its tenant by email alone. `httpapi.login` now resolves
+  the tenant from the email (no tenant hint in the form); an unknown email is
+  rate-limited under the default tenant and runs the dummy password check, so
+  timing/enumeration behavior is unchanged and there is no tenant leak. A
+  cross-tenant duplicate email is rejected at creation (`ErrConflict` → 409) at
+  both setup and the admin-create endpoint. Tests: `store.TestGlobalEmail`
+  (global uniqueness + resolve-by-email) and
+  `httpapi.TestLoginResolvesTenantFromEmail` (a second-tenant admin logs in with
+  no hint and gets a tenant-B session; unknown email → 401).
 - **Phase 3 — provider tenant management.** `provider` owner flag; provider API
   to create/list tenants (each with its own CA via `bootstrap.Init`); audit.
   Test: provider creates tenant B, B's owner logs in, enrolls a device that gets

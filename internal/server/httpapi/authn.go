@@ -105,16 +105,23 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &req) {
 		return
 	}
-	tenant := a.Runtime().Keys.TenantID
 	email := strings.ToLower(strings.TrimSpace(req.Email))
-	key := auth.ClientIP(r) + "|" + email
 	now := a.now()
+
+	// Email is globally unique, so it resolves the tenant. When the email is
+	// unknown we still rate-limit and run the dummy password check (constant
+	// time, no enumeration); the limiter is keyed under the default tenant
+	// because login_failures rows require a real tenant.
+	admin, tenant, err := a.Store.GetAdminByEmailGlobal(r.Context(), email)
+	if err != nil {
+		tenant = a.Runtime().Keys.TenantID
+	}
+	key := auth.ClientIP(r) + "|" + email
 	if !a.limiter.allow(r.Context(), tenant, key, now) {
 		writeErr(w, http.StatusTooManyRequests, "too many failed attempts; try again later")
 		return
 	}
 
-	admin, err := a.Store.GetAdminByEmail(r.Context(), tenant, email)
 	var hash *string
 	if err == nil && !admin.Disabled {
 		hash = &admin.PasswordHash

@@ -59,6 +59,20 @@ func (s *Store) GetAdminByEmail(ctx context.Context, tenantID uuid.UUID, email s
 		tenantID, strings.ToLower(email)))
 }
 
+// GetAdminByEmailGlobal resolves an admin and its tenant by globally-unique
+// email. Login uses it because the tenant is not known until the admin is
+// found. Email is matched case-insensitively (stored lowercased).
+func (s *Store) GetAdminByEmailGlobal(ctx context.Context, email string) (Admin, uuid.UUID, error) {
+	var a Admin
+	var tid uuid.UUID
+	err := s.pool.QueryRow(ctx, `SELECT `+adminCols+`, tenant_id FROM admins WHERE email = $1`, strings.ToLower(email)).
+		Scan(&a.ID, &a.Email, &a.PasswordHash, &a.TOTPSecretEnc, &a.TOTPConfirmed, &a.Role, &a.Disabled, &a.CreatedAt, &tid)
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = ErrNotFound
+	}
+	return a, tid, err
+}
+
 func (s *Store) ListAdmins(ctx context.Context, tenantID uuid.UUID) ([]Admin, error) {
 	rows, _ := s.pool.Query(ctx, `SELECT `+adminCols+` FROM admins WHERE tenant_id = $1 ORDER BY email`, tenantID)
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Admin, error) { return scanAdmin(r) })

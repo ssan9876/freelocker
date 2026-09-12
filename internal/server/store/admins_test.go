@@ -67,3 +67,34 @@ func TestAdminsAndSessions(t *testing.T) {
 		t.Errorf("admins = %+v", list)
 	}
 }
+
+// TestGlobalEmail proves email is globally unique across tenants and that an
+// admin (with its tenant) can be resolved by email alone — the basis for
+// tenant-from-email login.
+func TestGlobalEmail(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenantA, _ := s.CreateTenant(ctx, "Acme")
+	tenantB, _ := s.CreateTenant(ctx, "Beta")
+
+	idA, err := s.CreateAdmin(ctx, tenantA, store.Admin{Email: "Amy@Example.com", PasswordHash: "h", Role: "owner"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateAdmin(ctx, tenantB, store.Admin{Email: "bob@example.com", PasswordHash: "h", Role: "owner"}); err != nil {
+		t.Fatal(err)
+	}
+	// Same email in a different tenant is now rejected globally.
+	if _, err := s.CreateAdmin(ctx, tenantB, store.Admin{Email: "amy@example.com", PasswordHash: "h", Role: "admin"}); !errors.Is(err, store.ErrConflict) {
+		t.Errorf("cross-tenant duplicate email err = %v, want ErrConflict", err)
+	}
+
+	// Resolve by email alone → correct admin and tenant (case-insensitive).
+	a, tid, err := s.GetAdminByEmailGlobal(ctx, "AMY@example.com")
+	if err != nil || a.ID != idA || tid != tenantA {
+		t.Fatalf("GetAdminByEmailGlobal = %+v, tid=%v, err=%v; want id=%v tenant=%v", a, tid, err, idA, tenantA)
+	}
+	if _, _, err := s.GetAdminByEmailGlobal(ctx, "nobody@example.com"); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("unknown email err = %v, want ErrNotFound", err)
+	}
+}

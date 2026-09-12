@@ -1,7 +1,11 @@
 package httpapi_test
 
 import (
+	"context"
 	"testing"
+
+	"freelocker/internal/server/auth"
+	"freelocker/internal/server/store"
 )
 
 func TestSetupOnlyOnce(t *testing.T) {
@@ -66,6 +70,46 @@ func TestFullLoginMeCSRFAndLogout(t *testing.T) {
 	}
 	if code := c.do("GET", "/api/me", nil, nil); code != 401 {
 		t.Errorf("/api/me after logout = %d, want 401", code)
+	}
+}
+
+// TestLoginResolvesTenantFromEmail proves that with globally-unique emails an
+// admin in a *second* tenant logs in without any tenant hint: the server finds
+// the tenant from the email and issues a session bound to that tenant. The
+// default-tenant owner still logs in too.
+func TestLoginResolvesTenantFromEmail(t *testing.T) {
+	ctx := context.Background()
+	e := newEnv(t)
+	e.initialized(t) // tenant A + owner@example.com
+
+	// A second tenant with its own admin, created straight in the store.
+	tenantB, err := e.store.CreateTenant(ctx, "Beta")
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash, err := auth.HashPassword(ownerPass)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const emailB = "admin@beta.example.com"
+	if _, err := e.store.CreateAdmin(ctx, tenantB, store.Admin{Email: emailB, PasswordHash: hash, Role: "owner"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Tenant B's admin logs in with no tenant hint and reaches /api/me. The
+	// session it gets must be bound to tenant B, not the default tenant.
+	cb := e.client(t)
+	cb.loginFull(emailB, ownerPass, "")
+	var me struct{ Email, Role string }
+	if code := cb.do("GET", "/api/me", nil, &me); code != 200 || me.Email != emailB {
+		t.Fatalf("tenant B /api/me = %d %+v", code, me)
+	}
+
+	// A bogus email is rejected without leaking that it is unknown (same 401
+	// as a bad password) and is still rate-limited under the default tenant.
+	cx := e.client(t)
+	if code := cx.do("POST", "/api/login", map[string]string{"email": "ghost@nowhere.test", "password": ownerPass}, nil); code != 401 {
+		t.Errorf("unknown-email login = %d, want 401", code)
 	}
 }
 
