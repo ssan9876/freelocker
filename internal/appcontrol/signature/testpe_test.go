@@ -17,9 +17,9 @@ import (
 
 // chain generates leaf + intermediate + root certificates. Each cert is
 // signed by the next; alg controls the leaf's signature algorithm.
-func chain(t *testing.T, alg x509.SignatureAlgorithm) (leafCert, mid, root *x509.Certificate) {
+func chain(t *testing.T, alg x509.SignatureAlgorithm) (leafCert, mid, root, timestamp *x509.Certificate) {
 	t.Helper()
-	mk := func(cn string, parent *x509.Certificate, parentKey *ecdsa.PrivateKey, isCA bool, sigAlg x509.SignatureAlgorithm) (*x509.Certificate, *ecdsa.PrivateKey) {
+	mk := func(cn string, parent *x509.Certificate, parentKey *ecdsa.PrivateKey, isCA bool, sigAlg x509.SignatureAlgorithm, eku ...x509.ExtKeyUsage) (*x509.Certificate, *ecdsa.PrivateKey) {
 		key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 		if err != nil {
 			t.Fatal(err)
@@ -32,6 +32,7 @@ func chain(t *testing.T, alg x509.SignatureAlgorithm) (leafCert, mid, root *x509
 			IsCA:                  isCA,
 			BasicConstraintsValid: true,
 			SignatureAlgorithm:    sigAlg,
+			ExtKeyUsage:           eku,
 		}
 		p, pk := parent, parentKey
 		if p == nil {
@@ -49,8 +50,12 @@ func chain(t *testing.T, alg x509.SignatureAlgorithm) (leafCert, mid, root *x509
 	}
 	rootC, rootKey := mk("Test Root", nil, nil, true, x509.ECDSAWithSHA256)
 	midC, midKey := mk("Test Intermediate", rootC, rootKey, true, x509.ECDSAWithSHA256)
-	leafC, _ := mk("Contoso Ltd", midC, midKey, false, alg)
-	return leafC, midC, rootC
+	leafC, _ := mk("Contoso Ltd", midC, midKey, false, alg, x509.ExtKeyUsageCodeSigning)
+	// A timestamping certificate, as real signed files embed alongside the
+	// signer. It is nobody's issuer, so identity must not be taken from it.
+	tsRoot, tsRootKey := mk("Timestamp Root", nil, nil, true, x509.ECDSAWithSHA256)
+	timestamp, _ = mk("Timestamp Responder 2026", tsRoot, tsRootKey, false, x509.ECDSAWithSHA256, x509.ExtKeyUsageTimeStamping)
+	return leafC, midC, rootC, timestamp
 }
 
 // signedPE writes a minimal PE whose certificate table holds a PKCS#7

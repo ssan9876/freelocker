@@ -11,7 +11,7 @@ import (
 )
 
 func TestTBSHashMatchesManualSHA256(t *testing.T) {
-	leafC, _, _ := chain(t, x509.ECDSAWithSHA256)
+	leafC, _, _, _ := chain(t, x509.ECDSAWithSHA256)
 	got, err := TBSHash(leafC)
 	if err != nil {
 		t.Fatal(err)
@@ -27,7 +27,7 @@ func TestTBSHashMatchesManualSHA256(t *testing.T) {
 }
 
 func TestTBSHashFollowsCertificateAlgorithm(t *testing.T) {
-	leafC, _, _ := chain(t, x509.ECDSAWithSHA384)
+	leafC, _, _, _ := chain(t, x509.ECDSAWithSHA384)
 	got, err := TBSHash(leafC)
 	if err != nil {
 		t.Fatal(err)
@@ -38,7 +38,7 @@ func TestTBSHashFollowsCertificateAlgorithm(t *testing.T) {
 }
 
 func TestLeafPicksNonIssuer(t *testing.T) {
-	leafC, mid, root := chain(t, x509.ECDSAWithSHA256)
+	leafC, mid, root, _ := chain(t, x509.ECDSAWithSHA256)
 	for _, order := range [][]*x509.Certificate{
 		{leafC, mid, root}, {root, mid, leafC}, {mid, root, leafC},
 	} {
@@ -49,7 +49,7 @@ func TestLeafPicksNonIssuer(t *testing.T) {
 }
 
 func TestFromFileReadsEmbeddedCertificate(t *testing.T) {
-	leafC, mid, root := chain(t, x509.ECDSAWithSHA256)
+	leafC, mid, root, _ := chain(t, x509.ECDSAWithSHA256)
 	path := signedPE(t, []*x509.Certificate{leafC, mid, root})
 
 	info, err := FromFile(path)
@@ -83,5 +83,24 @@ func TestFromFileUnsignedAndBroken(t *testing.T) {
 	}
 	if _, err := FromFile(filepath.Join(t.TempDir(), "missing.exe")); err == nil {
 		t.Error("missing file should error")
+	}
+}
+
+// A signed file embeds the timestamping certificates too. Identity must come
+// from the code-signing certificate, never the timestamp responder.
+func TestFromFilePrefersCodeSigningLeaf(t *testing.T) {
+	leafC, mid, root, timestamp := chain(t, x509.ECDSAWithSHA256)
+	path := signedPE(t, []*x509.Certificate{timestamp, leafC, mid, root})
+
+	info, err := FromFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := TBSHash(leafC)
+	if info.TBSHash != want || info.SubjectName != "Contoso Ltd" {
+		t.Fatalf("picked %q (%s), want Contoso Ltd (%s)", info.SubjectName, info.TBSHash, want)
+	}
+	if got := leaf([]*x509.Certificate{timestamp, leafC, mid, root}); got == nil || got.Subject.CommonName != "Contoso Ltd" {
+		t.Errorf("leaf() = %v, want the code-signing certificate", got)
 	}
 }

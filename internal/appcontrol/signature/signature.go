@@ -85,9 +85,12 @@ func hashFor(alg x509.SignatureAlgorithm) (crypto.Hash, error) {
 	}
 }
 
-// leaf returns the certificate that signs the file: the one that is not the
-// issuer of any other certificate in the set.
+// leaf returns the certificate that signs the file. Candidates are the
+// certificates that issue no other certificate in the set; a signed file also
+// embeds its timestamping chain, so a code-signing certificate always wins
+// over one that only does timestamping.
 func leaf(certs []*x509.Certificate) *x509.Certificate {
+	var fallback *x509.Certificate
 	for _, c := range certs {
 		isIssuer := false
 		for _, other := range certs {
@@ -96,11 +99,35 @@ func leaf(certs []*x509.Certificate) *x509.Certificate {
 				break
 			}
 		}
-		if !isIssuer {
+		if isIssuer {
+			continue
+		}
+		if codeSigner(c) {
 			return c
 		}
+		if fallback == nil && !timestamper(c) {
+			fallback = c
+		}
 	}
-	return nil
+	return fallback
+}
+
+func codeSigner(c *x509.Certificate) bool {
+	for _, u := range c.ExtKeyUsage {
+		if u == x509.ExtKeyUsageCodeSigning {
+			return true
+		}
+	}
+	return false
+}
+
+func timestamper(c *x509.Certificate) bool {
+	for _, u := range c.ExtKeyUsage {
+		if u == x509.ExtKeyUsageTimeStamping {
+			return true
+		}
+	}
+	return false
 }
 
 // embeddedCerts extracts the certificates from the PE's certificate table
