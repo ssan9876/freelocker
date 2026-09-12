@@ -88,7 +88,9 @@ block if it cannot keep the management channel.
 ## Testing (TDD)
 
 - Store: resolution truth table (override × group value × no-group), the
-  all-nil delete, cross-tenant `ErrNotFound`, cascade on device delete.
+  all-nil delete, cross-tenant `ErrNotFound`. (Removal with the device is the
+  FK's `ON DELETE CASCADE`; the app only revokes devices, so there is no
+  delete path to test.)
 - httpapi: get/set round-trip with nulls, effective/group fields, 404
   cross-tenant, 403 for readonly on POST.
 - agentapi: a device's `GetControls` reflects an override that loosens its
