@@ -228,7 +228,11 @@ func (r *Runner) syncControls(ctx context.Context, client flv1.AgentClient) {
 		}
 		return
 	}
-	if err := r.Controls.Apply(ctx, controls.Controls{USBStorageBlocked: resp.GetUsbStorageBlocked()}); err != nil {
+	if err := r.Controls.Apply(ctx, controls.Controls{
+		USBStorageBlocked: resp.GetUsbStorageBlocked(),
+		NetworkBlocked:    resp.GetNetworkBlocked(),
+		ElevationBlocked:  resp.GetElevationBlocked(),
+	}); err != nil {
 		r.log().Error("apply controls", "err", err)
 	}
 }

@@ -118,6 +118,8 @@ func (*GetControlsRequest) Descriptor() ([]byte, []int) {
 type ControlsResponse struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	UsbStorageBlocked bool                   `protobuf:"varint,1,opt,name=usb_storage_blocked,json=usbStorageBlocked,proto3" json:"usb_storage_blocked,omitempty"`
+	NetworkBlocked    bool                   `protobuf:"varint,2,opt,name=network_blocked,json=networkBlocked,proto3" json:"network_blocked,omitempty"`
+	ElevationBlocked  bool                   `protobuf:"varint,3,opt,name=elevation_blocked,json=elevationBlocked,proto3" json:"elevation_blocked,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -155,6 +157,20 @@ func (*ControlsResponse) Descriptor() ([]byte, []int) {
 func (x *ControlsResponse) GetUsbStorageBlocked() bool {
 	if x != nil {
 		return x.UsbStorageBlocked
+	}
+	return false
+}
+
+func (x *ControlsResponse) GetNetworkBlocked() bool {
+	if x != nil {
+		return x.NetworkBlocked
+	}
+	return false
+}
+
+func (x *ControlsResponse) GetElevationBlocked() bool {
+	if x != nil {
+		return x.ElevationBlocked
 	}
 	return false
 }
@@ -1433,9 +1449,11 @@ var File_freelocker_v1_agent_proto protoreflect.FileDescriptor
 const file_freelocker_v1_agent_proto_rawDesc = "" +
 	"\n" +
 	"\x19freelocker/v1/agent.proto\x12\rfreelocker.v1\"\x14\n" +
-	"\x12GetControlsRequest\"B\n" +
+	"\x12GetControlsRequest\"\x98\x01\n" +
 	"\x10ControlsResponse\x12.\n" +
-	"\x13usb_storage_blocked\x18\x01 \x01(\bR\x11usbStorageBlocked\"]\n" +
+	"\x13usb_storage_blocked\x18\x01 \x01(\bR\x11usbStorageBlocked\x12'\n" +
+	"\x0fnetwork_blocked\x18\x02 \x01(\bR\x0enetworkBlocked\x12+\n" +
+	"\x11elevation_blocked\x18\x03 \x01(\bR\x10elevationBlocked\"]\n" +
 	"\x0eMetricsRequest\x12\x17\n" +
 	"\acpu_pct\x18\x01 \x01(\x01R\x06cpuPct\x12\x17\n" +
 	"\amem_pct\x18\x02 \x01(\x01R\x06memPct\x12\x19\n" +

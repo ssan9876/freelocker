@@ -103,7 +103,7 @@ func runAgent(log *slog.Logger) error {
 	}
 	r.Executor = &executor.Executor{Actions: act, Log: log}
 	r.Enforcer = enforcer.Default(paths.DataDir)
-	r.Controls = controls.Default()
+	r.Controls = controls.Default(cfg.ServerURL)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()

@@ -10,21 +10,28 @@ import (
 
 type DeviceControls struct {
 	USBStorageBlocked bool
+	NetworkBlocked    bool
+	ElevationBlocked  bool
 }
 
 func (s *Store) SetControls(ctx context.Context, tenantID, groupID uuid.UUID, c DeviceControls) error {
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO device_controls (tenant_id, group_id, usb_storage_blocked, updated_at)
-		VALUES ($1,$2,$3, now())
-		ON CONFLICT (group_id) DO UPDATE SET usb_storage_blocked=EXCLUDED.usb_storage_blocked, updated_at=now()`,
-		tenantID, groupID, c.USBStorageBlocked)
+		INSERT INTO device_controls (tenant_id, group_id, usb_storage_blocked, network_blocked, elevation_blocked, updated_at)
+		VALUES ($1,$2,$3,$4,$5, now())
+		ON CONFLICT (group_id) DO UPDATE SET
+			usb_storage_blocked=EXCLUDED.usb_storage_blocked,
+			network_blocked=EXCLUDED.network_blocked,
+			elevation_blocked=EXCLUDED.elevation_blocked,
+			updated_at=now()`,
+		tenantID, groupID, c.USBStorageBlocked, c.NetworkBlocked, c.ElevationBlocked)
 	return err
 }
 
 func (s *Store) GetControls(ctx context.Context, tenantID, groupID uuid.UUID) (DeviceControls, error) {
 	var c DeviceControls
-	err := s.pool.QueryRow(ctx, `SELECT usb_storage_blocked FROM device_controls WHERE tenant_id=$1 AND group_id=$2`,
-		tenantID, groupID).Scan(&c.USBStorageBlocked)
+	err := s.pool.QueryRow(ctx,
+		`SELECT usb_storage_blocked, network_blocked, elevation_blocked FROM device_controls WHERE tenant_id=$1 AND group_id=$2`,
+		tenantID, groupID).Scan(&c.USBStorageBlocked, &c.NetworkBlocked, &c.ElevationBlocked)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -37,10 +44,13 @@ func (s *Store) GetControls(ctx context.Context, tenantID, groupID uuid.UUID) (D
 func (s *Store) EffectiveControlsForDevice(ctx context.Context, tenantID, deviceID uuid.UUID) (DeviceControls, error) {
 	var c DeviceControls
 	err := s.pool.QueryRow(ctx, `
-		SELECT COALESCE(dc.usb_storage_blocked, false)
+		SELECT COALESCE(dc.usb_storage_blocked, false),
+		       COALESCE(dc.network_blocked, false),
+		       COALESCE(dc.elevation_blocked, false)
 		FROM devices d
 		LEFT JOIN device_controls dc ON dc.group_id = d.group_id AND dc.tenant_id = d.tenant_id
-		WHERE d.tenant_id=$1 AND d.id=$2`, tenantID, deviceID).Scan(&c.USBStorageBlocked)
+		WHERE d.tenant_id=$1 AND d.id=$2`, tenantID, deviceID).
+		Scan(&c.USBStorageBlocked, &c.NetworkBlocked, &c.ElevationBlocked)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return DeviceControls{}, ErrNotFound
 	}

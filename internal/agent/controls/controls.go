@@ -1,13 +1,18 @@
-// Package controls applies device/behavior controls on the endpoint. v1
-// covers USB mass-storage. The Windows enforcer toggles the USBSTOR
-// service; other platforms use a no-op. Default is allow — a control
-// blocks only when explicitly set.
+// Package controls applies device/behavior controls on the endpoint:
+// USB mass-storage, network access, and elevation. The Windows enforcer
+// makes reversible registry/firewall changes; other platforms use a
+// no-op. Default is allow — a control blocks only when explicitly set.
+//
+// SAFETY: network blocking always keeps an allow-exception for the
+// FreeLocker server so the agent can never cut its own management link.
 package controls
 
 import "context"
 
 type Controls struct {
 	USBStorageBlocked bool
+	NetworkBlocked    bool
+	ElevationBlocked  bool
 }
 
 type Enforcer interface {

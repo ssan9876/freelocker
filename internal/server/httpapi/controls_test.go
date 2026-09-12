@@ -9,21 +9,30 @@ func TestGroupControlsOverHTTP(t *testing.T) {
 	var grp struct{ ID string }
 	c.do("POST", "/api/groups", map[string]string{"name": "WS"}, &grp)
 
-	// Default: not blocked.
+	// Default: nothing blocked.
 	var got struct {
 		USBStorageBlocked bool `json:"usb_storage_blocked"`
+		NetworkBlocked    bool `json:"network_blocked"`
+		ElevationBlocked  bool `json:"elevation_blocked"`
 	}
 	c.do("GET", "/api/groups/"+grp.ID+"/controls", nil, &got)
-	if got.USBStorageBlocked {
-		t.Error("default should be allow")
+	if got.USBStorageBlocked || got.NetworkBlocked || got.ElevationBlocked {
+		t.Errorf("default should be all-allow: %+v", got)
 	}
-	// Block it.
-	if code := c.do("POST", "/api/groups/"+grp.ID+"/controls", map[string]bool{"usb_storage_blocked": true}, nil); code != 204 {
+	// Set all three.
+	body := map[string]bool{"usb_storage_blocked": true, "network_blocked": true, "elevation_blocked": true}
+	if code := c.do("POST", "/api/groups/"+grp.ID+"/controls", body, nil); code != 204 {
 		t.Fatalf("set controls = %d", code)
 	}
 	c.do("GET", "/api/groups/"+grp.ID+"/controls", nil, &got)
-	if !got.USBStorageBlocked {
-		t.Error("controls should reflect the block")
+	if !got.USBStorageBlocked || !got.NetworkBlocked || !got.ElevationBlocked {
+		t.Errorf("controls should reflect all blocks: %+v", got)
+	}
+	// Clearing one persists the others independently.
+	c.do("POST", "/api/groups/"+grp.ID+"/controls", map[string]bool{"usb_storage_blocked": true, "network_blocked": false, "elevation_blocked": true}, nil)
+	c.do("GET", "/api/groups/"+grp.ID+"/controls", nil, &got)
+	if !got.USBStorageBlocked || got.NetworkBlocked || !got.ElevationBlocked {
+		t.Errorf("partial update wrong: %+v", got)
 	}
 }
 

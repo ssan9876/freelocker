@@ -91,7 +91,11 @@ func (s *agentService) GetControls(ctx context.Context, _ *flv1.GetControlsReque
 		s.d.Log.Error("resolve controls", "device", dev.ID, "err", err)
 		return nil, status.Error(codes.Internal, "could not resolve controls")
 	}
-	return &flv1.ControlsResponse{UsbStorageBlocked: c.USBStorageBlocked}, nil
+	return &flv1.ControlsResponse{
+		UsbStorageBlocked: c.USBStorageBlocked,
+		NetworkBlocked:    c.NetworkBlocked,
+		ElevationBlocked:  c.ElevationBlocked,
+	}, nil
 }
 
 func (s *agentService) ReportMetrics(ctx context.Context, req *flv1.MetricsRequest) (*flv1.Ack, error) {

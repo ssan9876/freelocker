@@ -97,14 +97,20 @@ func (a *API) getControls(w http.ResponseWriter, r *http.Request) {
 	}
 	c, err := a.Store.GetControls(r.Context(), principalFrom(r).TenantID, id)
 	if err == store.ErrNotFound {
-		writeJSON(w, http.StatusOK, map[string]bool{"usb_storage_blocked": false})
-		return
-	}
-	if err != nil {
+		c = store.DeviceControls{} // default: nothing blocked
+	} else if err != nil {
 		a.storeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"usb_storage_blocked": c.USBStorageBlocked})
+	writeJSON(w, http.StatusOK, controlsJSON(c))
+}
+
+func controlsJSON(c store.DeviceControls) map[string]bool {
+	return map[string]bool{
+		"usb_storage_blocked": c.USBStorageBlocked,
+		"network_blocked":     c.NetworkBlocked,
+		"elevation_blocked":   c.ElevationBlocked,
+	}
 }
 
 func (a *API) setControls(w http.ResponseWriter, r *http.Request) {
@@ -114,16 +120,21 @@ func (a *API) setControls(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		USBStorageBlocked bool `json:"usb_storage_blocked"`
+		NetworkBlocked    bool `json:"network_blocked"`
+		ElevationBlocked  bool `json:"elevation_blocked"`
 	}
 	if !readJSON(w, r, &req) {
 		return
 	}
+	c := store.DeviceControls{USBStorageBlocked: req.USBStorageBlocked, NetworkBlocked: req.NetworkBlocked, ElevationBlocked: req.ElevationBlocked}
 	p := principalFrom(r)
-	if err := a.Store.SetControls(r.Context(), p.TenantID, id, store.DeviceControls{USBStorageBlocked: req.USBStorageBlocked}); err != nil {
+	if err := a.Store.SetControls(r.Context(), p.TenantID, id, c); err != nil {
 		a.storeErr(w, err)
 		return
 	}
-	a.audit(r, p, "controls.set", "group", id.String(), map[string]any{"usb_storage_blocked": req.USBStorageBlocked}, "success")
+	a.audit(r, p, "controls.set", "group", id.String(), map[string]any{
+		"usb_storage_blocked": c.USBStorageBlocked, "network_blocked": c.NetworkBlocked, "elevation_blocked": c.ElevationBlocked,
+	}, "success")
 	w.WriteHeader(http.StatusNoContent)
 }
 

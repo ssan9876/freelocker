@@ -24,6 +24,8 @@ message GetControlsRequest {}
 
 message ControlsResponse {
   bool usb_storage_blocked = 1;
+  bool network_blocked = 2;
+  bool elevation_blocked = 3;
 }
 
 message MetricsRequest {
