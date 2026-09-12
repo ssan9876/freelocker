@@ -46,7 +46,9 @@ Activity page); **health/readiness probes** and **Let's Encrypt** console
 TLS; **multi-instance safety** (the login rate-limiter and alert breach
 state live in Postgres) and **time-series retention**; a **GitHub Actions
 CI** pipeline (Go tests + Postgres, Windows cross-compile, console build,
-Playwright E2E). **MSP multi-tenancy** is designed and phased in
+Playwright E2E). **MSP multi-tenancy** is built end to end — per-tenant keys
+and CAs, SNI-selected per-tenant transport, global-email login, a
+provider tenant-management API, and a provider console view — see
 `docs/superpowers/specs/2026-09-11-msp-multitenancy-design.md`.
 
 Anything that could lock or destabilize a real machine (WDAC enforcement,

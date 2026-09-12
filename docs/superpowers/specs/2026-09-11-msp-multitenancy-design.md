@@ -93,8 +93,15 @@ with a provider-level super-admin who can create and switch between tenants.
   provider creates tenant Beta; Beta's owner logs in with no hint and is an
   owner but not a provider; Beta's CA differs from the default tenant's (so a
   device enrolling into Beta trusts Beta's CA); a duplicate owner email → 409.
-- **Phase 4 — console provider view + tenant scoping.** UI to list tenants and
-  manage one; ordinary admins unaffected.
+- **Phase 4 — console provider view. DONE.** `/api/me` carries `provider`;
+  `web/src/pages/Tenants.tsx` lists tenants and creates one (org + owner email +
+  password) via the provider API. The "Tenants" nav item and the `/tenants`
+  route are rendered only when `me.provider` is true, so ordinary admins never
+  see them; a non-provider who reaches the API still gets 403 (Phase 3). The
+  console typechecks and builds. E2E is unchanged: the existing Playwright smoke
+  test stops at MFA enrollment (a browser cannot complete TOTP without the
+  shared secret), so the provider flow is covered by the Go API test
+  `httpapi.TestProviderCreatesTenant` rather than a click-through.
 
 ## Risks & why it's isolated from the other work
 - It changes the CA and auth paths that every feature relies on; a subtle error

@@ -18,6 +18,9 @@ const NAV = [
   { to: "/audit", label: "Audit log" },
 ];
 
+// Shown only to a provider (the MSP operator) who manages tenants.
+const PROVIDER_NAV = [{ to: "/tenants", label: "Tenants" }];
+
 export function Layout() {
   const { me, logout } = useAuth();
   const theme = useTheme();
@@ -41,7 +44,7 @@ export function Layout() {
         <div className="brand">
           <span className="lock">▣</span> FreeLocker
         </div>
-        {NAV.map((n) => (
+        {[...NAV, ...(me?.provider ? PROVIDER_NAV : [])].map((n) => (
           <NavLink
             key={n.to}
             to={n.to}

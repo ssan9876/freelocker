@@ -50,7 +50,8 @@ export const api = {
   },
 };
 
-export type Me = { id: string; email: string; role: string };
+export type Me = { id: string; email: string; role: string; provider: boolean };
+export type Tenant = { id: string; name: string; created_at: string };
 export type SetupStatus = { initialized: boolean };
 export type LoginResult = { csrf_token: string; mfa_enrolled: boolean };
 export type MfaSetup = { secret: string; otpauth_url: string };

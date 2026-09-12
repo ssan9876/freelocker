@@ -20,6 +20,7 @@ import { Groups } from "./pages/Groups";
 import { Admins } from "./pages/Admins";
 import { Audit } from "./pages/Audit";
 import { Releases } from "./pages/Releases";
+import { Tenants } from "./pages/Tenants";
 
 export function App() {
   const { ready, me, mfaPassed } = useAuth();
@@ -84,6 +85,7 @@ export function App() {
         <Route path="/admins" element={<Admins />} />
         <Route path="/releases" element={<Releases />} />
         <Route path="/audit" element={<Audit />} />
+        {me.provider && <Route path="/tenants" element={<Tenants />} />}
         <Route path="*" element={<Navigate to="/devices" replace />} />
       </Route>
     </Routes>
