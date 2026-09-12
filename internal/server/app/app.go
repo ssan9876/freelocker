@@ -15,12 +15,12 @@ import (
 	"time"
 
 	"freelocker/internal/server/agentapi"
+	"freelocker/internal/server/alerting"
 	"freelocker/internal/server/auth"
 	"freelocker/internal/server/bootstrap"
 	"freelocker/internal/server/commands"
 	"freelocker/internal/server/config"
 	"freelocker/internal/server/httpapi"
-	"freelocker/internal/server/alerting"
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/keys"
 	"freelocker/internal/server/policysvc"
@@ -328,6 +328,14 @@ func (a *App) Run(ctx context.Context) error {
 			// Housekeeping: drop login failures older than the rate-limit window.
 			if _, err := a.store.PruneLoginFailures(ctx, time.Now().Add(-15*time.Minute)); err != nil {
 				a.log.Error("prune login failures", "err", err)
+			}
+			// Time-series retention.
+			if days := a.cfg.MetricsRetentionDays; days > 0 {
+				if n, err := a.store.Retention(ctx, time.Now().AddDate(0, 0, -days)); err != nil {
+					a.log.Error("retention prune", "err", err)
+				} else if n > 0 {
+					a.log.Info("pruned old time-series rows", "count", n, "older_than_days", days)
+				}
 			}
 		}
 	}

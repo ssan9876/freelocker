@@ -12,18 +12,19 @@ import (
 )
 
 type Config struct {
-	DatabaseURL      string   `yaml:"database_url"`
-	AgentListen      string   `yaml:"agent_listen"`
-	ConsoleListen    string   `yaml:"console_listen"`
-	PublicHostnames  []string `yaml:"public_hostnames"`
-	MasterSecretFile string   `yaml:"master_secret_file"`
-	ConsoleTLSCert   string   `yaml:"console_tls_cert"`
-	ConsoleTLSKey    string   `yaml:"console_tls_key"`
-	InsecureCookies  bool     `yaml:"insecure_cookies"`
-	ReleaseDir       string   `yaml:"release_dir"`
-	ACMEDomains      []string `yaml:"acme_domains"`    // enable Let's Encrypt for the console on these domains
-	ACMEEmail        string   `yaml:"acme_email"`      // contact email for the ACME account
-	ACMECacheDir     string   `yaml:"acme_cache_dir"`  // where issued certs are cached
+	DatabaseURL          string   `yaml:"database_url"`
+	AgentListen          string   `yaml:"agent_listen"`
+	ConsoleListen        string   `yaml:"console_listen"`
+	PublicHostnames      []string `yaml:"public_hostnames"`
+	MasterSecretFile     string   `yaml:"master_secret_file"`
+	ConsoleTLSCert       string   `yaml:"console_tls_cert"`
+	ConsoleTLSKey        string   `yaml:"console_tls_key"`
+	InsecureCookies      bool     `yaml:"insecure_cookies"`
+	ReleaseDir           string   `yaml:"release_dir"`
+	ACMEDomains          []string `yaml:"acme_domains"`           // enable Let's Encrypt for the console on these domains
+	ACMEEmail            string   `yaml:"acme_email"`             // contact email for the ACME account
+	ACMECacheDir         string   `yaml:"acme_cache_dir"`         // where issued certs are cached
+	MetricsRetentionDays int      `yaml:"metrics_retention_days"` // delete metrics/block-events/resolved-alerts older than this
 }
 
 // ConsoleTLSMode reports how the console listener obtains TLS:
@@ -42,12 +43,13 @@ func (c Config) ConsoleTLSMode() string {
 
 func Load(path string) (Config, error) {
 	c := Config{
-		AgentListen:      ":8443",
-		ConsoleListen:    ":8080",
-		PublicHostnames:  []string{"localhost"},
-		MasterSecretFile: "master.key",
-		ReleaseDir:       "releases",
-		ACMECacheDir:     "acme-cache",
+		AgentListen:          ":8443",
+		ConsoleListen:        ":8080",
+		PublicHostnames:      []string{"localhost"},
+		MasterSecretFile:     "master.key",
+		ReleaseDir:           "releases",
+		ACMECacheDir:         "acme-cache",
+		MetricsRetentionDays: 30,
 	}
 	if path != "" {
 		b, err := os.ReadFile(path)

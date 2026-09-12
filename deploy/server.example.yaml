@@ -14,3 +14,4 @@ insecure_cookies: false        # true only for plain-HTTP access to a non-localh
 acme_domains: []               # e.g. [console.example.com]
 acme_email: ""                 # ACME account contact
 acme_cache_dir: acme-cache     # where issued certificates are cached
+metrics_retention_days: 30  # delete metrics/block-events/resolved-alerts older than this many days (0 disables)
