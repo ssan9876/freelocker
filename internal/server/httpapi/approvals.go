@@ -28,9 +28,9 @@ type approvalJSON struct {
 func (a *API) listApprovals(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	switch status {
-	case "", "pending", "approved", "denied":
+	case "", "pending", "approved", "denied", "expired":
 	default:
-		writeErr(w, http.StatusBadRequest, "status must be pending, approved, or denied")
+		writeErr(w, http.StatusBadRequest, "status must be pending, approved, denied, or expired")
 		return
 	}
 	reqs, err := a.Store.ListApprovalRequests(r.Context(), principalFrom(r).TenantID, status, queryInt(r, "limit", 200, 1000))
@@ -86,8 +86,26 @@ func (a *API) decideApproval(w http.ResponseWriter, r *http.Request, status stri
 		return
 	}
 	if status == "approved" {
+		// Approve as a hash rule (default) or, when a path is known, a path
+		// rule. Publisher approval needs the certificate TBS hash, which
+		// block events don't carry, so it isn't offered here.
+		kind := rules.Hash
+		value := req.SHA256
+		if r.Body != nil {
+			var body struct {
+				Kind string `json:"kind"`
+			}
+			_ = readJSONOptional(r, &body)
+			if body.Kind == "path" {
+				if req.Path == "" {
+					writeErr(w, http.StatusBadRequest, "cannot approve by path: this request has no path")
+					return
+				}
+				kind, value = rules.Path, req.Path
+			}
+		}
 		norm, err := rules.Normalize(rules.Rule{
-			Kind: rules.Hash, Value: req.SHA256,
+			Kind: kind, Value: value,
 			Description: fmt.Sprintf("approved from request %s (%s)", req.ID, req.Path),
 		})
 		if err != nil {

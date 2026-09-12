@@ -337,6 +337,14 @@ func (a *App) Run(ctx context.Context) error {
 					a.log.Info("pruned old time-series rows", "count", n, "older_than_days", days)
 				}
 			}
+			// Expire stale pending approval requests.
+			if days := a.cfg.ApprovalExpiryDays; days > 0 {
+				if n, err := a.store.ExpireApprovalRequests(ctx, time.Now().AddDate(0, 0, -days)); err != nil {
+					a.log.Error("expire approvals", "err", err)
+				} else if n > 0 {
+					a.log.Info("expired stale approval requests", "count", n)
+				}
+			}
 		}
 	}
 }

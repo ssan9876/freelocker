@@ -25,6 +25,7 @@ type Config struct {
 	ACMEEmail            string   `yaml:"acme_email"`             // contact email for the ACME account
 	ACMECacheDir         string   `yaml:"acme_cache_dir"`         // where issued certs are cached
 	MetricsRetentionDays int      `yaml:"metrics_retention_days"` // delete metrics/block-events/resolved-alerts older than this
+	ApprovalExpiryDays   int      `yaml:"approval_expiry_days"`   // pending approval requests idle this long become expired (0 disables)
 }
 
 // ConsoleTLSMode reports how the console listener obtains TLS:
@@ -50,6 +51,7 @@ func Load(path string) (Config, error) {
 		ReleaseDir:           "releases",
 		ACMECacheDir:         "acme-cache",
 		MetricsRetentionDays: 30,
+		ApprovalExpiryDays:   30,
 	}
 	if path != "" {
 		b, err := os.ReadFile(path)

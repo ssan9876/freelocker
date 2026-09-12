@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 )
 
@@ -28,4 +30,17 @@ func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 		return false
 	}
 	return true
+}
+
+// readJSONOptional decodes a body into v if one is present. An empty body
+// is not an error (v keeps its zero values); malformed JSON is returned.
+func readJSONOptional(r *http.Request, v any) error {
+	if r.Body == nil {
+		return nil
+	}
+	err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(v)
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	return err
 }

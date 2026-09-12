@@ -25,12 +25,12 @@ export function Approvals() {
     return () => clearInterval(t);
   }, [status]);
 
-  const decide = async (r: ApprovalRequest, action: "approve" | "deny") => {
+  const decide = async (r: ApprovalRequest, action: "approve" | "deny", kind?: "hash" | "path") => {
     if (action === "deny" && !window.confirm(`Deny ${r.path || r.sha256}? It will stop appearing as pending.`)) return;
     setBusy(r.id);
     try {
-      await api.post(`/api/approvals/${r.id}/${action}`);
-      notify(action === "approve" ? `Approved — added to ${r.policy_name}` : "Denied");
+      await api.post(`/api/approvals/${r.id}/${action}`, action === "approve" ? { kind: kind ?? "hash" } : undefined);
+      notify(action === "approve" ? `Approved as ${kind ?? "hash"} — added to ${r.policy_name}` : "Denied");
     } catch (e) {
       notify(e instanceof ApiError ? e.message : `Could not ${action}`, "error");
     } finally {
@@ -47,6 +47,7 @@ export function Approvals() {
           <option value="pending">Pending</option>
           <option value="approved">Approved</option>
           <option value="denied">Denied</option>
+          <option value="expired">Expired</option>
         </select>
       </div>
       <p className="who" style={{ marginTop: -8, marginBottom: 14 }}>
@@ -88,9 +89,14 @@ export function Approvals() {
                       r.decided_at ? fmtDate(r.decided_at) : "—"
                     ) : canDecide ? (
                       <div className="toolbar" style={{ margin: 0, flexWrap: "nowrap" }}>
-                        <button className="primary" disabled={busy === r.id} onClick={() => decide(r, "approve")}>
+                        <button className="primary" disabled={busy === r.id} onClick={() => decide(r, "approve", "hash")}>
                           Approve
                         </button>
+                        {r.path && (
+                          <button className="ghost" disabled={busy === r.id} onClick={() => decide(r, "approve", "path")} title={`Allow anything at ${r.path}`}>
+                            Approve by path
+                          </button>
+                        )}
                         <button className="ghost" disabled={busy === r.id} onClick={() => decide(r, "deny")}>
                           Deny
                         </button>

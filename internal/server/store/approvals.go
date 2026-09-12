@@ -154,3 +154,11 @@ func (s *Store) CountPendingApprovals(ctx context.Context, tenantID uuid.UUID) (
 	err := s.pool.QueryRow(ctx, `SELECT count(*) FROM approval_requests WHERE tenant_id=$1 AND status='pending'`, tenantID).Scan(&n)
 	return n, err
 }
+
+// ExpireApprovalRequests marks pending requests with no activity since
+// `before` as expired, across all tenants. Returns the number expired.
+func (s *Store) ExpireApprovalRequests(ctx context.Context, before time.Time) (int64, error) {
+	tag, err := s.pool.Exec(ctx, `UPDATE approval_requests SET status='expired'
+		WHERE status='pending' AND last_seen < $1`, before)
+	return tag.RowsAffected(), err
+}

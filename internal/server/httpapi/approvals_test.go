@@ -117,3 +117,24 @@ func TestApprovalsReadonlyCannotDecide(t *testing.T) {
 		t.Errorf("readonly approve = %d, want 403", code)
 	}
 }
+
+func TestApproveAsPath(t *testing.T) {
+	e := newEnv(t)
+	c := e.initialized(t)
+
+	var pol struct{ ID string }
+	c.do("POST", "/api/policies", map[string]string{"name": "Baseline"}, &pol)
+	id := e.seedApproval(t, pol.ID, strings.ToUpper(hex64("e")))
+
+	// Approve as a path rule (the seeded request has path C:\new.exe).
+	if code := c.do("POST", "/api/approvals/"+id+"/approve", map[string]string{"kind": "path"}, nil); code != 204 {
+		t.Fatalf("approve as path = %d", code)
+	}
+	var detail struct {
+		Rules []map[string]any `json:"rules"`
+	}
+	c.do("GET", "/api/policies/"+pol.ID, nil, &detail)
+	if len(detail.Rules) != 1 || detail.Rules[0]["kind"] != "path" || detail.Rules[0]["value"] != `C:\new.exe` {
+		t.Fatalf("expected a path rule, got %+v", detail.Rules)
+	}
+}

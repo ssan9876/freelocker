@@ -99,3 +99,29 @@ func TestApprovalRequestDecide(t *testing.T) {
 		t.Errorf("other tenant get = %v, want ErrNotFound", err)
 	}
 }
+
+func TestExpireApprovalRequests(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	pol, _ := s.CreatePolicy(ctx, tenant, "Baseline", "audit")
+	dev := seedDevice(t, s, tenant)
+
+	old := time.Now().Add(-48 * time.Hour).Truncate(time.Second)
+	recent := time.Now().Add(-1 * time.Hour).Truncate(time.Second)
+	s.UpsertApprovalRequests(ctx, tenant, pol, dev, []store.BlockEvent{{SHA256: "OLD", Path: `C:\o.exe`, At: old}})
+	s.UpsertApprovalRequests(ctx, tenant, pol, dev, []store.BlockEvent{{SHA256: "NEW", Path: `C:\n.exe`, At: recent}})
+
+	n, err := s.ExpireApprovalRequests(ctx, time.Now().Add(-24*time.Hour))
+	if err != nil || n != 1 {
+		t.Fatalf("expired %d, %v; want 1", n, err)
+	}
+	pending, _ := s.ListApprovalRequests(ctx, tenant, "pending", 10)
+	if len(pending) != 1 || pending[0].SHA256 != "NEW" {
+		t.Errorf("pending after expiry = %+v", pending)
+	}
+	expired, _ := s.ListApprovalRequests(ctx, tenant, "expired", 10)
+	if len(expired) != 1 || expired[0].SHA256 != "OLD" {
+		t.Errorf("expired list = %+v", expired)
+	}
+}

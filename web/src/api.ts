@@ -155,7 +155,7 @@ export type BlockEvent = {
   blocked: boolean;
   at: string;
 };
-export type ApprovalStatus = "pending" | "approved" | "denied";
+export type ApprovalStatus = "pending" | "approved" | "denied" | "expired";
 export type ApprovalRequest = {
   id: string;
   policy_id: string;
