@@ -7,9 +7,10 @@
   --border: #d5ddd5;
   --ink: #101410;
   --muted: #5c6a5c;
-  --accent: #157a3c;
+  --accent: #1f7a48;
   --accent-ink: #ffffff;
-  --online: #1f9d4f;
+  --accent-soft: rgba(31, 122, 72, 0.12);
+  --online: #2a9a5b;
   --warn: #b7791f;
   --danger: #c02636;
   --danger-ink: #ffffff;
@@ -21,18 +22,19 @@
 
 :root[data-theme="dark"],
 :root:not([data-theme="light"]) {
-  --paper: #050705;
-  --surface: #0c100d;
-  --surface-2: #131a15;
-  --border: #1f2a22;
-  --ink: #e4ece6;
-  --muted: #7f9186;
-  --accent: #35d472;
-  --accent-ink: #04150a;
-  --online: #4ade80;
-  --warn: #e0a72a;
-  --danger: #ff5c5c;
-  --danger-ink: #1a0808;
+  --paper: #0b0e0c;
+  --surface: #121614;
+  --surface-2: #181e1a;
+  --border: #242c27;
+  --ink: #d6ddd8;
+  --muted: #8a968e;
+  --accent: #3fae6d;
+  --accent-ink: #f2f7f3;
+  --accent-soft: rgba(63, 174, 109, 0.14);
+  --online: #4cbf7b;
+  --warn: #c9962a;
+  --danger: #e05a5a;
+  --danger-ink: #f9ecec;
   color-scheme: dark;
 }
 
@@ -43,9 +45,10 @@
   --border: #d5ddd5;
   --ink: #101410;
   --muted: #5c6a5c;
-  --accent: #157a3c;
+  --accent: #1f7a48;
   --accent-ink: #ffffff;
-  --online: #1f9d4f;
+  --accent-soft: rgba(31, 122, 72, 0.12);
+  --online: #2a9a5b;
   --warn: #b7791f;
   --danger: #c02636;
   --danger-ink: #ffffff;
@@ -103,9 +106,9 @@ input, select {
   font: inherit;
 }
 input:focus, select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 button {
   font: inherit;
@@ -119,7 +122,8 @@ button {
 }
 button:hover { background: var(--surface-2); }
 button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-button.primary:hover { filter: brightness(1.06); }
+button.primary:hover { filter: brightness(1.08); }
+button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); border-color: var(--accent); }
 button.danger { background: var(--danger); color: var(--danger-ink); border-color: var(--danger); }
 button.ghost { background: transparent; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -145,7 +149,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   font-weight: 500;
 }
 .nav-item:hover { background: var(--surface-2); text-decoration: none; }
-.nav-item.active { background: var(--accent); color: var(--accent-ink); }
+.nav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 .main { display: flex; flex-direction: column; min-width: 0; }
 .topbar {
   display: flex;
