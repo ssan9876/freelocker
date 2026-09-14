@@ -83,7 +83,7 @@ func NewWithStore(cfg config.Config, s *store.Store, master []byte, log *slog.Lo
 	api := &httpapi.API{
 		Store: s, Runtime: a.runtime, Setup: a.setup, ProvisionTenant: a.ProvisionTenant, Hub: a.hub, TOTPSealer: totpSealer,
 		Sessions: &auth.Sessions{Store: s, Secure: !cfg.InsecureCookies}, ReleaseDir: cfg.ReleaseDir,
-		KeyFor: a.keyProvider.For, Log: log,
+		ReleaseURL: cfg.ReleaseURL, KeyFor: a.keyProvider.For, Log: log,
 	}
 	apiHandler := api.Handler()
 

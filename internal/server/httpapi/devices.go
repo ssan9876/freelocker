@@ -1,9 +1,11 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
+	flv1 "freelocker/gen/freelocker/v1"
 	"freelocker/internal/server/agentapi"
 	"freelocker/internal/server/auth"
 	"freelocker/internal/server/commands"
@@ -122,12 +124,37 @@ func (a *API) issueCommand(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, "device revoked")
 		return
 	}
-	cmdID, err := a.Runtime().Commands.Issue(r.Context(), p.TenantID, id, typ, nil, &p.Admin.ID, "admin:"+p.Admin.Email)
-	if err != nil {
-		a.storeErr(w, err)
-		return
+	var cmdID uuid.UUID
+	if typ == flv1.CommandType_COMMAND_TYPE_UPDATE_AGENT {
+		rel, err := a.Store.LatestRelease(r.Context(), p.TenantID)
+		if errors.Is(err, store.ErrNotFound) {
+			writeErr(w, http.StatusConflict, "no agent release uploaded")
+			return
+		}
+		if err != nil {
+			a.storeErr(w, err)
+			return
+		}
+		cmdID, err = a.Runtime().Commands.IssueUpdate(r.Context(), p.TenantID, id, a.updatePayload(rel), "admin:"+p.Admin.Email)
+		if err != nil {
+			a.storeErr(w, err)
+			return
+		}
+	} else {
+		var err error
+		cmdID, err = a.Runtime().Commands.Issue(r.Context(), p.TenantID, id, typ, nil, &p.Admin.ID, "admin:"+p.Admin.Email)
+		if err != nil {
+			a.storeErr(w, err)
+			return
+		}
 	}
 	writeJSON(w, http.StatusCreated, map[string]string{"id": cmdID.String()})
+}
+
+// updatePayload turns a stored release into the signed command payload the
+// agent verifies before installing.
+func (a *API) updatePayload(rel store.Release) commands.UpdatePayload {
+	return commands.UpdatePayload{Version: rel.Version, URL: a.ReleaseURL(rel.Version), SHA256: rel.SHA256, Signature: rel.Signature}
 }
 
 type commandJSON struct {

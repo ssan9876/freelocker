@@ -5,6 +5,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
@@ -21,6 +22,7 @@ type Config struct {
 	ConsoleTLSKey        string   `yaml:"console_tls_key"`
 	InsecureCookies      bool     `yaml:"insecure_cookies"`
 	ReleaseDir           string   `yaml:"release_dir"`
+	ReleaseBaseURL       string   `yaml:"release_base_url"`       // agents download releases from <this>/agent/releases/<version>; default derived from public_hostnames + console_listen
 	ACMEDomains          []string `yaml:"acme_domains"`           // enable Let's Encrypt for the console on these domains
 	ACMEEmail            string   `yaml:"acme_email"`             // contact email for the ACME account
 	ACMECacheDir         string   `yaml:"acme_cache_dir"`         // where issued certs are cached
@@ -40,6 +42,29 @@ func (c Config) ConsoleTLSMode() string {
 	default:
 		return "plain"
 	}
+}
+
+// ReleaseURL is the URL an agent downloads a release from. ReleaseBaseURL
+// wins when set; otherwise it is built from the first public hostname and
+// the console listener's port, https unless the console has no TLS.
+func (c Config) ReleaseURL(version string) string {
+	base := strings.TrimRight(c.ReleaseBaseURL, "/")
+	if base == "" {
+		host := "localhost"
+		if len(c.PublicHostnames) > 0 && c.PublicHostnames[0] != "" {
+			host = c.PublicHostnames[0]
+		}
+		scheme := "https"
+		if c.ConsoleTLSMode() == "plain" {
+			scheme = "http"
+		}
+		_, port, err := net.SplitHostPort(c.ConsoleListen)
+		if err != nil || port == "" {
+			port = "8080"
+		}
+		base = scheme + "://" + host + ":" + port
+	}
+	return base + "/agent/releases/" + version
 }
 
 func Load(path string) (Config, error) {
@@ -69,6 +94,7 @@ func Load(path string) (Config, error) {
 	envStr(&c.ConsoleTLSCert, "FREELOCKER_CONSOLE_TLS_CERT")
 	envStr(&c.ConsoleTLSKey, "FREELOCKER_CONSOLE_TLS_KEY")
 	envStr(&c.ReleaseDir, "FREELOCKER_RELEASE_DIR")
+	envStr(&c.ReleaseBaseURL, "FREELOCKER_RELEASE_BASE_URL")
 	envStr(&c.ACMEEmail, "FREELOCKER_ACME_EMAIL")
 	envStr(&c.ACMECacheDir, "FREELOCKER_ACME_CACHE_DIR")
 	if v := os.Getenv("FREELOCKER_ACME_DOMAINS"); v != "" {

@@ -51,7 +51,8 @@ func newEnv(t *testing.T) *env {
 
 	api := &httpapi.API{
 		Store: s, Hub: h, TOTPSealer: sealer, Sessions: &auth.Sessions{Store: s}, Runtime: e.rt, ReleaseDir: t.TempDir(),
-		KeyFor: keyset.New(s, master).For,
+		ReleaseURL: func(v string) string { return "http://test.local/agent/releases/" + v },
+		KeyFor:     keyset.New(s, master).For,
 		Setup: func(ctx context.Context, org, email, pw string) error {
 			if _, err := bootstrap.Init(ctx, s, master, org, time.Now()); err != nil {
 				return err

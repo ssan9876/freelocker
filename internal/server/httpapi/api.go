@@ -46,6 +46,8 @@ type API struct {
 	TOTPSealer      *keys.Sealer
 	Sessions        *auth.Sessions
 	ReleaseDir      string
+	// ReleaseURL builds the URL an agent downloads a release version from.
+	ReleaseURL func(version string) string
 	// KeyFor resolves per-tenant keys; when nil the Runtime's single keys
 	// are used (single-tenant).
 	KeyFor keyset.Func
