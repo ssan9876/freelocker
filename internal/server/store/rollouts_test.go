@@ -103,3 +103,163 @@ func TestOpenRolloutsSkipsSuspendedTenants(t *testing.T) {
 		t.Fatalf("open = %+v, %v", open, err)
 	}
 }
+
+// enrollTestDevice creates a device in the tenant (optionally in a group)
+// reporting the given agent version.
+func enrollTestDevice(t *testing.T, s *store.Store, tenant uuid.UUID, group *uuid.UUID, hostname, version string) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	id := uuid.New()
+	hash := []byte("h-" + id.String())
+	if _, err := s.CreateInstallToken(ctx, tenant, store.InstallToken{Name: hostname, GroupID: group}, hash); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.EnrollDevice(ctx, hash, time.Now(), func(uuid.UUID) (store.NewDevice, error) {
+		return store.NewDevice{ID: id, Hostname: hostname, CertSerial: "s-" + hostname, CertExpiresAt: time.Now().Add(time.Hour)}, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RecordHeartbeat(ctx, tenant, id, store.Inventory{Hostname: hostname, AgentVersion: version}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+func newTestRollout(t *testing.T, s *store.Store, tenant uuid.UUID, groups []uuid.UUID) store.Rollout {
+	t.Helper()
+	ctx := context.Background()
+	s.PutRelease(ctx, tenant, store.Release{Version: "2.0.0", SHA256: make([]byte, 32), Signature: []byte("sig")})
+	r := store.Rollout{ID: uuid.New(), Version: "2.0.0", GroupIDs: groups, BatchSize: 10, MaxFailures: 3, State: "active", CreatedBy: "x"}
+	if err := s.CreateRollout(ctx, tenant, r); err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+func TestRolloutCandidates(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	ws, _ := s.CreateDeviceGroup(ctx, tenant, "WS")
+	srv, _ := s.CreateDeviceGroup(ctx, tenant, "SRV")
+	old := enrollTestDevice(t, s, tenant, &ws, "b-old", "1.0.0")
+	enrollTestDevice(t, s, tenant, &ws, "a-current", "2.0.0")
+	enrollTestDevice(t, s, tenant, &srv, "c-other-group", "1.0.0")
+	revoked := enrollTestDevice(t, s, tenant, &ws, "d-revoked", "1.0.0")
+	s.RevokeDevice(ctx, tenant, revoked)
+	rowed := enrollTestDevice(t, s, tenant, &ws, "e-rowed", "1.0.0")
+
+	r := newTestRollout(t, s, tenant, []uuid.UUID{ws})
+	s.AddRolloutDevice(ctx, r.ID, rowed, uuid.New(), time.Now())
+
+	c, err := s.RolloutCandidates(ctx, tenant, r.ID)
+	if err != nil || len(c) != 1 || c[0].DeviceID != old || c[0].Hostname != "b-old" {
+		t.Fatalf("group candidates = %+v, %v (want only b-old)", c, err)
+	}
+
+	// Empty group set = every device in the tenant.
+	s.SetRolloutState(ctx, tenant, r.ID, []string{"active"}, "cancelled", time.Now())
+	all := newTestRollout(t, s, tenant, nil)
+	c, _ = s.RolloutCandidates(ctx, tenant, all.ID)
+	if len(c) != 3 || c[0].Hostname != "b-old" || c[1].Hostname != "c-other-group" || c[2].Hostname != "e-rowed" {
+		t.Fatalf("all candidates = %+v (want b-old, c-other-group, e-rowed by hostname)", c)
+	}
+}
+
+func TestResolveRolloutDevices(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	r := newTestRollout(t, s, tenant, nil)
+	now := time.Now()
+	timeout := 10 * time.Minute
+
+	mk := func(name string) (uuid.UUID, uuid.UUID) {
+		dev := enrollTestDevice(t, s, tenant, nil, name, "1.0.0")
+		cmd := uuid.New()
+		if err := s.CreateCommand(ctx, tenant, store.Command{ID: cmd, DeviceID: dev, Type: "update_agent", IssuedAt: now, ExpiresAt: now.Add(time.Hour)}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.AddRolloutDevice(ctx, r.ID, dev, cmd, now); err != nil {
+			t.Fatal(err)
+		}
+		return dev, cmd
+	}
+	updatedDev, updatedCmd := mk("updated")
+	failedDev, failedCmd := mk("failed")
+	timedOutDev, timedOutCmd := mk("timedout")
+	freshDev, freshCmd := mk("fresh")
+	_, _ = mk("pending")
+
+	// updated: command succeeded AND version reported.
+	s.CompleteCommand(ctx, tenant, updatedDev, updatedCmd, true, "ok", now)
+	s.RecordHeartbeat(ctx, tenant, updatedDev, store.Inventory{Hostname: "updated", AgentVersion: "2.0.0"}, now)
+	// failed: command result failure.
+	s.CompleteCommand(ctx, tenant, failedDev, failedCmd, false, "hash mismatch", now)
+	// timed out: succeeded long ago, still old version.
+	s.CompleteCommand(ctx, tenant, timedOutDev, timedOutCmd, true, "ok", now.Add(-timeout-time.Minute))
+	// fresh: succeeded just now, old version → still issued.
+	s.CompleteCommand(ctx, tenant, freshDev, freshCmd, true, "ok", now)
+
+	up, fail, err := s.ResolveRolloutDevices(ctx, tenant, r.ID, now, timeout)
+	if err != nil || up != 1 || fail != 2 {
+		t.Fatalf("resolve = %d updated, %d failed, %v (want 1, 2)", up, fail, err)
+	}
+	devs, _ := s.ListRolloutDevices(ctx, tenant, r.ID)
+	states := map[string]string{}
+	details := map[string]string{}
+	for _, d := range devs {
+		states[d.Hostname] = d.State
+		details[d.Hostname] = d.Detail
+	}
+	want := map[string]string{"updated": "updated", "failed": "failed", "timedout": "failed", "fresh": "issued", "pending": "issued"}
+	for h, st := range want {
+		if states[h] != st {
+			t.Errorf("%s state = %q, want %q", h, states[h], st)
+		}
+	}
+	if details["failed"] != "failed: hash mismatch" {
+		t.Errorf("failed detail = %q", details["failed"])
+	}
+	if details["timedout"] == "" {
+		t.Error("timed-out device should carry a detail")
+	}
+	// Idempotent: nothing new resolves on a second call.
+	up, fail, _ = s.ResolveRolloutDevices(ctx, tenant, r.ID, now, timeout)
+	if up != 0 || fail != 0 {
+		t.Errorf("second resolve = %d, %d", up, fail)
+	}
+
+	sum, err := s.RolloutSummary(ctx, tenant, r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Targeted != 5 || sum.AlreadyCurrent != 0 || sum.Issued != 2 || sum.Updated != 1 || sum.Failed != 2 || sum.Remaining != 0 {
+		t.Errorf("summary = %+v", sum)
+	}
+}
+
+func TestRolloutSummaryCountsCurrentAndRemaining(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	enrollTestDevice(t, s, tenant, nil, "cur", "2.0.0")
+	enrollTestDevice(t, s, tenant, nil, "old1", "1.0.0")
+	enrollTestDevice(t, s, tenant, nil, "old2", "1.0.0")
+	r := newTestRollout(t, s, tenant, nil)
+	sum, _ := s.RolloutSummary(ctx, tenant, r.ID)
+	if sum.Targeted != 3 || sum.AlreadyCurrent != 1 || sum.Remaining != 2 || sum.Issued != 0 {
+		t.Errorf("summary = %+v", sum)
+	}
+	// Expired command → failed.
+	dev := enrollTestDevice(t, s, tenant, nil, "old3", "1.0.0")
+	cmd := uuid.New()
+	past := time.Now().Add(-2 * time.Hour)
+	s.CreateCommand(ctx, tenant, store.Command{ID: cmd, DeviceID: dev, Type: "update_agent", IssuedAt: past, ExpiresAt: past.Add(time.Hour)})
+	s.AddRolloutDevice(ctx, r.ID, dev, cmd, past)
+	s.ExpireCommands(ctx, time.Now())
+	_, fail, _ := s.ResolveRolloutDevices(ctx, tenant, r.ID, time.Now(), 10*time.Minute)
+	if fail != 1 {
+		t.Errorf("expired command should fail the device; failed = %d", fail)
+	}
+}

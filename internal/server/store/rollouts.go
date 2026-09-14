@@ -123,3 +123,144 @@ func prefixCols(p, cols string) string {
 	}
 	return strings.Join(parts, ", ")
 }
+
+type RolloutDevice struct {
+	DeviceID   uuid.UUID
+	Hostname   string
+	CommandID  uuid.UUID
+	State      string // issued|updated|failed
+	Detail     string
+	IssuedAt   time.Time
+	ResolvedAt *time.Time
+}
+
+type RolloutCandidate struct {
+	DeviceID uuid.UUID
+	Hostname string
+}
+
+type RolloutSummary struct {
+	Targeted       int // non-revoked devices matched by the group set
+	AlreadyCurrent int // targeted, no row, already on the version
+	Issued         int
+	Updated        int
+	Failed         int
+	Remaining      int // targeted − already_current − issued − updated − failed
+}
+
+// RolloutCandidates lists targeted, non-revoked devices not yet on the
+// rollout's version and without a progress row, ordered by hostname. The
+// caller filters by online presence and applies the batch cap.
+func (s *Store) RolloutCandidates(ctx context.Context, tenantID, id uuid.UUID) ([]RolloutCandidate, error) {
+	rows, _ := s.pool.Query(ctx, `
+		SELECT d.id, d.hostname FROM devices d
+		JOIN agent_rollouts r ON r.tenant_id = d.tenant_id AND r.id = $2
+		WHERE d.tenant_id = $1 AND NOT d.revoked AND d.agent_version <> r.version
+		  AND (cardinality(r.group_ids) = 0 OR d.group_id = ANY(r.group_ids))
+		  AND NOT EXISTS (SELECT 1 FROM agent_rollout_devices rd WHERE rd.rollout_id = r.id AND rd.device_id = d.id)
+		ORDER BY d.hostname, d.id`, tenantID, id)
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (RolloutCandidate, error) {
+		var c RolloutCandidate
+		return c, r.Scan(&c.DeviceID, &c.Hostname)
+	})
+}
+
+func (s *Store) AddRolloutDevice(ctx context.Context, rolloutID, deviceID, commandID uuid.UUID, now time.Time) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO agent_rollout_devices (rollout_id, device_id, command_id, state, issued_at)
+		VALUES ($1, $2, $3, 'issued', $4)`, rolloutID, deviceID, commandID, now)
+	return conflict(err)
+}
+
+func (s *Store) ListRolloutDevices(ctx context.Context, tenantID, id uuid.UUID) ([]RolloutDevice, error) {
+	rows, _ := s.pool.Query(ctx, `
+		SELECT rd.device_id, d.hostname, rd.command_id, rd.state, rd.detail, rd.issued_at, rd.resolved_at
+		FROM agent_rollout_devices rd
+		JOIN agent_rollouts r ON r.id = rd.rollout_id
+		JOIN devices d ON d.id = rd.device_id
+		WHERE r.tenant_id = $1 AND rd.rollout_id = $2
+		ORDER BY rd.issued_at, d.hostname`, tenantID, id)
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (RolloutDevice, error) {
+		var d RolloutDevice
+		return d, r.Scan(&d.DeviceID, &d.Hostname, &d.CommandID, &d.State, &d.Detail, &d.IssuedAt, &d.ResolvedAt)
+	})
+}
+
+// ResolveRolloutDevices moves issued rows to a terminal state:
+//   - updated: the device now reports the rollout version;
+//   - failed:  the command failed or expired, or it succeeded before
+//     now−confirmTimeout and the device still reports another version.
+// Returns how many rows became updated and failed.
+func (s *Store) ResolveRolloutDevices(ctx context.Context, tenantID, id uuid.UUID, now time.Time, confirmTimeout time.Duration) (updated, failed int, err error) {
+	cutoff := now.Add(-confirmTimeout)
+	rows, err := s.pool.Query(ctx, `
+		UPDATE agent_rollout_devices rd SET state = x.state, detail = x.detail, resolved_at = $3
+		FROM (
+			SELECT rd.device_id,
+				CASE
+					WHEN d.agent_version = r.version THEN 'updated'
+					WHEN c.state IN ('failed', 'expired') THEN 'failed'
+					WHEN c.state = 'succeeded' AND c.completed_at <= $4 THEN 'failed'
+				END AS state,
+				CASE
+					WHEN d.agent_version = r.version THEN ''
+					WHEN c.state IN ('failed', 'expired') THEN c.state || ': ' || c.result
+					ELSE 'agent did not report ' || r.version || ' after the update command succeeded'
+				END AS detail
+			FROM agent_rollout_devices rd
+			JOIN agent_rollouts r ON r.id = rd.rollout_id
+			JOIN devices d ON d.id = rd.device_id
+			JOIN commands c ON c.id = rd.command_id
+			WHERE r.tenant_id = $1 AND rd.rollout_id = $2 AND rd.state = 'issued'
+		) x
+		WHERE rd.rollout_id = $2 AND rd.device_id = x.device_id AND x.state IS NOT NULL
+		RETURNING rd.state`, tenantID, id, now, cutoff)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var st string
+		if err := rows.Scan(&st); err != nil {
+			return 0, 0, err
+		}
+		if st == "updated" {
+			updated++
+		} else {
+			failed++
+		}
+	}
+	return updated, failed, rows.Err()
+}
+
+func (s *Store) RolloutSummary(ctx context.Context, tenantID, id uuid.UUID) (RolloutSummary, error) {
+	var sum RolloutSummary
+	var exists int
+	err := s.pool.QueryRow(ctx, `
+		WITH r AS (SELECT id, version, group_ids FROM agent_rollouts WHERE tenant_id = $1 AND id = $2),
+		targeted AS (
+			SELECT d.id, d.agent_version FROM devices d, r
+			WHERE d.tenant_id = $1 AND NOT d.revoked AND (cardinality(r.group_ids) = 0 OR d.group_id = ANY(r.group_ids))
+		),
+		rows AS (SELECT state FROM agent_rollout_devices rd, r WHERE rd.rollout_id = r.id)
+		SELECT
+			(SELECT count(*) FROM targeted),
+			(SELECT count(*) FROM targeted t, r WHERE t.agent_version = r.version
+				AND NOT EXISTS (SELECT 1 FROM agent_rollout_devices rd WHERE rd.rollout_id = r.id AND rd.device_id = t.id)),
+			(SELECT count(*) FROM rows WHERE state = 'issued'),
+			(SELECT count(*) FROM rows WHERE state = 'updated'),
+			(SELECT count(*) FROM rows WHERE state = 'failed'),
+			(SELECT count(*) FROM r)`, tenantID, id).
+		Scan(&sum.Targeted, &sum.AlreadyCurrent, &sum.Issued, &sum.Updated, &sum.Failed, &exists)
+	if err != nil {
+		return sum, err
+	}
+	if exists == 0 { // the rollout is not in this tenant
+		return sum, ErrNotFound
+	}
+	sum.Remaining = sum.Targeted - sum.AlreadyCurrent - sum.Issued - sum.Updated - sum.Failed
+	if sum.Remaining < 0 {
+		sum.Remaining = 0
+	}
+	return sum, nil
+}
