@@ -19,6 +19,7 @@ import (
 	"freelocker/internal/server/keys"
 	"freelocker/internal/server/keyset"
 	"freelocker/internal/server/policysvc"
+	"freelocker/internal/server/rollout"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/store/storetest"
 
@@ -70,10 +71,12 @@ func newEnv(t *testing.T) *env {
 				return err
 			}
 			mu.Lock()
+			cmds := &commands.Service{Store: s, Keys: k, Hub: h}
 			rt = &httpapi.Runtime{
 				Keys:     k,
-				Commands: &commands.Service{Store: s, Keys: k, Hub: h},
+				Commands: cmds,
 				Policy:   &policysvc.Service{Store: s, Keys: k},
+				Rollouts: &rollout.Service{Store: s, Commands: cmds, Online: h.Connected, ReleaseURL: func(v string) string { return "http://test.local/agent/releases/" + v }},
 			}
 			mu.Unlock()
 			return nil

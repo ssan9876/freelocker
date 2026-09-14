@@ -25,6 +25,7 @@ import (
 	"freelocker/internal/server/keys"
 	"freelocker/internal/server/keyset"
 	"freelocker/internal/server/policysvc"
+	"freelocker/internal/server/rollout"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/tokens"
 	"freelocker/internal/server/webui"
@@ -266,6 +267,10 @@ func (a *App) activate(k *bootstrap.Keys) error {
 	} else if n > 0 {
 		a.log.Info("recompiled policies", "count", n)
 	}
+	rollouts := &rollout.Service{
+		Store: a.store, Commands: cmds, Online: a.hub.Connected, ReleaseURL: a.cfg.ReleaseURL,
+		ConfirmTimeout: rollout.DefaultConfirmTimeout, Log: a.log,
+	}
 	alerts := alerting.New(a.store)
 	tlsCfg := agentapi.NewTenantTLS(a.keyProvider, a.store, a.cfg.PublicHostnames, time.Now).Config()
 	lis, err := net.Listen("tcp", a.cfg.AgentListen)
@@ -279,7 +284,7 @@ func (a *App) activate(k *bootstrap.Keys) error {
 		}
 	}()
 	a.mu.Lock()
-	a.rt = &httpapi.Runtime{Keys: k, Commands: cmds, Policy: policy}
+	a.rt = &httpapi.Runtime{Keys: k, Commands: cmds, Policy: policy, Rollouts: rollouts}
 	a.agentSrv, a.agentAddr = srv, lis.Addr()
 	a.mu.Unlock()
 	a.log.Info("agent API listening", "addr", lis.Addr().String(), "ca_pin", k.CA.Pin())
@@ -347,6 +352,9 @@ func (a *App) Run(ctx context.Context) error {
 					a.log.Error("expire commands", "err", err)
 				} else if n > 0 {
 					a.log.Info("expired stale commands", "count", n)
+				}
+				if err := rt.Rollouts.Tick(ctx); err != nil {
+					a.log.Error("rollout tick", "err", err)
 				}
 			}
 			// Housekeeping: drop login failures older than the rate-limit window.

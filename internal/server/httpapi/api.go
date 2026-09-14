@@ -14,6 +14,7 @@ import (
 	"freelocker/internal/server/keys"
 	"freelocker/internal/server/keyset"
 	"freelocker/internal/server/policysvc"
+	"freelocker/internal/server/rollout"
 	"freelocker/internal/server/store"
 
 	"github.com/go-chi/chi/v5"
@@ -33,6 +34,7 @@ type Runtime struct {
 	Keys     *bootstrap.Keys
 	Commands *commands.Service
 	Policy   *policysvc.Service
+	Rollouts *rollout.Service
 }
 
 type API struct {
