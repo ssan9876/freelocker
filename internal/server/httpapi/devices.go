@@ -135,7 +135,7 @@ func (a *API) issueCommand(w http.ResponseWriter, r *http.Request) {
 			a.storeErr(w, err)
 			return
 		}
-		cmdID, err = a.Runtime().Commands.IssueUpdate(r.Context(), p.TenantID, id, a.updatePayload(rel), "admin:"+p.Admin.Email)
+		cmdID, err = a.Runtime().Commands.IssueUpdate(r.Context(), p.TenantID, id, a.updatePayload(p.TenantID, rel), "admin:"+p.Admin.Email)
 		if err != nil {
 			a.storeErr(w, err)
 			return
@@ -153,8 +153,8 @@ func (a *API) issueCommand(w http.ResponseWriter, r *http.Request) {
 
 // updatePayload turns a stored release into the signed command payload the
 // agent verifies before installing.
-func (a *API) updatePayload(rel store.Release) commands.UpdatePayload {
-	return commands.UpdatePayload{Version: rel.Version, URL: a.ReleaseURL(rel.Version), SHA256: rel.SHA256, Signature: rel.Signature}
+func (a *API) updatePayload(tenantID uuid.UUID, rel store.Release) commands.UpdatePayload {
+	return commands.UpdatePayload{Version: rel.Version, URL: a.ReleaseURL(tenantID, rel.Version), SHA256: rel.SHA256, Signature: rel.Signature}
 }
 
 type commandJSON struct {

@@ -14,6 +14,7 @@ import (
 	"freelocker/internal/server/store"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 func (a *API) uploadRelease(w http.ResponseWriter, r *http.Request) {
@@ -37,12 +38,13 @@ func (a *API) uploadRelease(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	if err := os.MkdirAll(a.ReleaseDir, 0o755); err != nil {
+	p := principalFrom(r)
+	dir := filepath.Join(a.ReleaseDir, p.TenantID.String())
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not create release dir")
 		return
 	}
-	dst := filepath.Join(a.ReleaseDir, version+".exe")
-	out, err := os.Create(dst)
+	out, err := os.Create(filepath.Join(dir, version+".exe"))
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not write release")
 		return
@@ -55,7 +57,6 @@ func (a *API) uploadRelease(w http.ResponseWriter, r *http.Request) {
 	}
 	out.Close()
 	sum := h.Sum(nil)
-	p := principalFrom(r)
 	k, err := a.keysFor(r.Context(), p.TenantID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "could not resolve signing key")
@@ -83,19 +84,55 @@ func (a *API) listReleases(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// downloadRelease is unauthenticated; the agent verifies hash + signature.
+// downloadRelease is unauthenticated; the agent verifies hash + signature
+// against the values in the signed update command, so serving the file needs
+// no session. The tenant is in the path: two tenants may ship the same
+// version string with different binaries.
 func (a *API) downloadRelease(w http.ResponseWriter, r *http.Request) {
-	version := chi.URLParam(r, "version")
-	if a.ReleaseDir == "" || strings.ContainsAny(version, `/\`) || strings.Contains(version, "..") {
+	version, ok := releaseVersion(r)
+	if !ok {
 		writeErr(w, http.StatusNotFound, "not found")
 		return
 	}
-	f, err := os.Open(filepath.Join(a.ReleaseDir, version+".exe"))
+	tenant, err := uuid.Parse(chi.URLParam(r, "tenant"))
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "not found")
 		return
 	}
+	// Fall back to the flat path for releases uploaded by a server from
+	// before release files were stored per tenant.
+	if !a.serveRelease(w, filepath.Join(a.ReleaseDir, tenant.String(), version+".exe")) &&
+		!a.serveRelease(w, filepath.Join(a.ReleaseDir, version+".exe")) {
+		writeErr(w, http.StatusNotFound, "not found")
+	}
+}
+
+// downloadLegacyRelease serves the pre-tenant-scoping URL, which update
+// commands issued before the upgrade still point at.
+func (a *API) downloadLegacyRelease(w http.ResponseWriter, r *http.Request) {
+	version, ok := releaseVersion(r)
+	if !ok || !a.serveRelease(w, filepath.Join(a.ReleaseDir, version+".exe")) {
+		writeErr(w, http.StatusNotFound, "not found")
+	}
+}
+
+// releaseVersion returns the version from the path, rejecting anything that
+// could escape the release dir.
+func releaseVersion(r *http.Request) (string, bool) {
+	v := chi.URLParam(r, "version")
+	return v, v != "" && !strings.ContainsAny(v, `/\`) && !strings.Contains(v, "..")
+}
+
+func (a *API) serveRelease(w http.ResponseWriter, path string) bool {
+	if a.ReleaseDir == "" {
+		return false
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
 	defer f.Close()
 	w.Header().Set("Content-Type", "application/octet-stream")
 	io.Copy(w, f)
+	return true
 }

@@ -133,7 +133,12 @@ release_base_url: https://console.example.com   # no trailing slash
 
 Env `FREELOCKER_RELEASE_BASE_URL`. Default: `<scheme>://<PublicHostnames[0]><port of ConsoleListen>`
 where scheme is `https` unless `ConsoleTLSMode() == "plain"`. The payload URL
-is `<release_base_url>/agent/releases/<version>`. Integrity comes from the
+is `<release_base_url>/agent/releases/<tenant_id>/<version>`, matching the
+on-disk layout `<release_dir>/<tenant_id>/<version>.exe`: two tenants may ship
+the same version string with different binaries, so neither the path nor the
+URL may be keyed on the version alone. The tenant-less URL and flat path are
+still served, read-only, for update commands issued and files uploaded before
+this split. Integrity comes from the
 hash and Ed25519 signature the agent already verifies, so the transport need
 not be trusted, but a self-signed console cert will fail the agent's default
 HTTP client; deployments with self-signed console TLS should set

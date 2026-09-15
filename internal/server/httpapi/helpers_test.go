@@ -56,8 +56,10 @@ func newEnv(t *testing.T) *env {
 	api := &httpapi.API{
 		Store: s, Hub: h, TOTPSealer: sealer, NotifySealer: notifySealer, SMTPConfigured: false,
 		Sessions: &auth.Sessions{Store: s}, Runtime: e.rt, ReleaseDir: t.TempDir(),
-		ReleaseURL: func(v string) string { return "http://test.local/agent/releases/" + v },
-		KeyFor:     keyset.New(s, master).For,
+		ReleaseURL: func(tid uuid.UUID, v string) string {
+			return "http://test.local/agent/releases/" + tid.String() + "/" + v
+		},
+		KeyFor: keyset.New(s, master).For,
 		Setup: func(ctx context.Context, org, email, pw string) error {
 			if _, err := bootstrap.Init(ctx, s, master, org, time.Now()); err != nil {
 				return err
@@ -80,8 +82,10 @@ func newEnv(t *testing.T) *env {
 				Keys:     k,
 				Commands: cmds,
 				Policy:   &policysvc.Service{Store: s, Keys: k},
-				Rollouts: &rollout.Service{Store: s, Commands: cmds, Online: h.Connected, ReleaseURL: func(v string) string { return "http://test.local/agent/releases/" + v }},
-				Notify:   notify.New(s, notifySealer, config.SMTP{}, nil),
+				Rollouts: &rollout.Service{Store: s, Commands: cmds, Online: h.Connected, ReleaseURL: func(tid uuid.UUID, v string) string {
+					return "http://test.local/agent/releases/" + tid.String() + "/" + v
+				}},
+				Notify: notify.New(s, notifySealer, config.SMTP{}, nil),
 			}
 			mu.Unlock()
 			return nil

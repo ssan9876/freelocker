@@ -45,8 +45,10 @@ func newFixture(t *testing.T) *fixture {
 	cmds := &commands.Service{Store: s, Keys: k, Hub: hub.New(), Now: func() time.Time { return f.now }}
 	f.svc = &rollout.Service{
 		Store: s, Commands: cmds,
-		Online:         func(id uuid.UUID) bool { return f.online[id] },
-		ReleaseURL:     func(v string) string { return "http://test.local/agent/releases/" + v },
+		Online: func(id uuid.UUID) bool { return f.online[id] },
+		ReleaseURL: func(tid uuid.UUID, v string) string {
+			return "http://test.local/agent/releases/" + tid.String() + "/" + v
+		},
 		Now:            func() time.Time { return f.now },
 		ConfirmTimeout: 10 * time.Minute,
 	}
@@ -141,7 +143,7 @@ func TestBatchCapAndOnlineFilter(t *testing.T) {
 			t.Fatalf("device commands = %d", len(cmds))
 		}
 		p, err := commands.ParseUpdate(cmds[0].Payload)
-		if err != nil || p.Version != "2.0.0" || p.URL != "http://test.local/agent/releases/2.0.0" {
+		if err != nil || p.Version != "2.0.0" || p.URL != "http://test.local/agent/releases/"+f.tenant.String()+"/2.0.0" {
 			t.Errorf("payload = %+v, %v", p, err)
 		}
 	}

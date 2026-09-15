@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 )
 
@@ -37,7 +38,7 @@ type Config struct {
 	ConsoleTLSKey        string   `yaml:"console_tls_key"`
 	InsecureCookies      bool     `yaml:"insecure_cookies"`
 	ReleaseDir           string   `yaml:"release_dir"`
-	ReleaseBaseURL       string   `yaml:"release_base_url"`       // agents download releases from <this>/agent/releases/<version>; default derived from public_hostnames + console_listen
+	ReleaseBaseURL       string   `yaml:"release_base_url"`       // agents download releases from <this>/agent/releases/<tenant>/<version>; default derived from public_hostnames + console_listen
 	ACMEDomains          []string `yaml:"acme_domains"`           // enable Let's Encrypt for the console on these domains
 	ACMEEmail            string   `yaml:"acme_email"`             // contact email for the ACME account
 	ACMECacheDir         string   `yaml:"acme_cache_dir"`         // where issued certs are cached
@@ -65,8 +66,10 @@ func (c Config) ConsoleTLSMode() string {
 
 // ReleaseURL is the URL an agent downloads a release from. ReleaseBaseURL
 // wins when set; otherwise it is built from the first public hostname and
-// the console listener's port, https unless the console has no TLS.
-func (c Config) ReleaseURL(version string) string {
+// the console listener's port, https unless the console has no TLS. The
+// tenant is in the path because two tenants may ship the same version
+// string, each with its own binary.
+func (c Config) ReleaseURL(tenantID uuid.UUID, version string) string {
 	base := strings.TrimRight(c.ReleaseBaseURL, "/")
 	if base == "" {
 		host := "localhost"
@@ -83,7 +86,7 @@ func (c Config) ReleaseURL(version string) string {
 		}
 		base = scheme + "://" + host + ":" + port
 	}
-	return base + "/agent/releases/" + url.PathEscape(version)
+	return base + "/agent/releases/" + tenantID.String() + "/" + url.PathEscape(version)
 }
 
 func Load(path string) (Config, error) {

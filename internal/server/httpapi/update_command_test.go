@@ -14,11 +14,18 @@ import (
 // release row + file exist for the tenant.
 func (c *client) uploadRelease(t *testing.T, version string) {
 	t.Helper()
+	c.uploadReleaseBody(t, version, []byte("fake-agent-binary-"+version))
+}
+
+// uploadReleaseBody is uploadRelease with the binary's bytes spelled out, for
+// tests that compare what comes back down.
+func (c *client) uploadReleaseBody(t *testing.T, version string, payload []byte) {
+	t.Helper()
 	body := &bytes.Buffer{}
 	mw := multipart.NewWriter(body)
 	mw.WriteField("version", version)
 	fw, _ := mw.CreateFormFile("file", "agent.exe")
-	fw.Write([]byte("fake-agent-binary-" + version))
+	fw.Write(payload)
 	mw.Close()
 	req, _ := http.NewRequest("POST", c.base+"/api/releases", body)
 	req.Header.Set("Content-Type", mw.FormDataContentType())
@@ -56,7 +63,9 @@ func TestUpdateAgentCommandCarriesReleasePayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("payload not parseable: %v", err)
 	}
-	if p.Version != "1.0.1" || p.URL != "http://test.local/agent/releases/1.0.1" || len(p.SHA256) != 32 || len(p.Signature) == 0 {
+	tenant, _ := e.store.FirstTenant(context.Background())
+	wantURL := "http://test.local/agent/releases/" + tenant.String() + "/1.0.1"
+	if p.Version != "1.0.1" || p.URL != wantURL || len(p.SHA256) != 32 || len(p.Signature) == 0 {
 		t.Errorf("payload = %+v", p)
 	}
 }

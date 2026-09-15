@@ -14,7 +14,7 @@ insecure_cookies: false        # true only for plain-HTTP access to a non-localh
 acme_domains: []               # e.g. [console.example.com]
 acme_email: ""                 # ACME account contact
 acme_cache_dir: acme-cache     # where issued certificates are cached
-release_dir: releases          # directory where agent releases are stored
+release_dir: releases          # directory where agent releases are stored, one subdirectory per tenant id
 release_base_url: ""           # URL agents download releases from (default: https://<first public hostname>:<console port>; http when the console has no TLS). Set it when the console sits behind a proxy or uses a self-signed cert.
 metrics_retention_days: 30  # delete metrics/block-events/resolved-alerts older than this many days (0 disables)
 approval_expiry_days: 30    # pending approval requests idle this long become expired (0 disables)

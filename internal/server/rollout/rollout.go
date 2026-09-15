@@ -23,8 +23,8 @@ type Service struct {
 	Commands *commands.Service
 	// Online reports whether a device currently holds a stream to the hub.
 	Online func(deviceID uuid.UUID) bool
-	// ReleaseURL builds the download URL for a version.
-	ReleaseURL func(version string) string
+	// ReleaseURL builds the download URL for a tenant's release version.
+	ReleaseURL func(tenantID uuid.UUID, version string) string
 	Now        func() time.Time
 	// ConfirmTimeout is how long after a successful update command a device
 	// may keep reporting the old version before it counts as failed.
@@ -122,7 +122,7 @@ func (s *Service) Reconcile(ctx context.Context, tenantID uuid.UUID, r store.Rol
 		if err != nil {
 			return fmt.Errorf("release %s: %w", r.Version, err)
 		}
-		payload := commands.UpdatePayload{Version: rel.Version, URL: s.ReleaseURL(rel.Version), SHA256: rel.SHA256, Signature: rel.Signature}
+		payload := commands.UpdatePayload{Version: rel.Version, URL: s.ReleaseURL(tenantID, rel.Version), SHA256: rel.SHA256, Signature: rel.Signature}
 		cands, err := s.Store.RolloutCandidates(ctx, tenantID, r.ID)
 		if err != nil {
 			return fmt.Errorf("candidates: %w", err)

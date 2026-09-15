@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 	"testing"
@@ -41,24 +42,27 @@ func TestLoadRequiresDatabaseURL(t *testing.T) {
 }
 
 func TestReleaseURLDefaultsAndOverride(t *testing.T) {
+	// The tenant is part of the path so two tenants can ship one version string.
+	tid := uuid.MustParse("11111111-2222-3333-4444-555555555555")
+	const tp = "/agent/releases/11111111-2222-3333-4444-555555555555/"
 	c := Config{PublicHostnames: []string{"console.example.com"}, ConsoleListen: ":8080"}
-	if got := c.ReleaseURL("1.2.3"); got != "http://console.example.com:8080/agent/releases/1.2.3" {
+	if got := c.ReleaseURL(tid, "1.2.3"); got != "http://console.example.com:8080"+tp+"1.2.3" {
 		t.Errorf("plain default = %q", got)
 	}
 	c.ConsoleTLSCert = "cert.pem"
-	if got := c.ReleaseURL("1.2.3"); got != "https://console.example.com:8080/agent/releases/1.2.3" {
+	if got := c.ReleaseURL(tid, "1.2.3"); got != "https://console.example.com:8080"+tp+"1.2.3" {
 		t.Errorf("tls default = %q", got)
 	}
 	c.ReleaseBaseURL = "https://updates.example.com/"
-	if got := c.ReleaseURL("1.2.3"); got != "https://updates.example.com/agent/releases/1.2.3" {
+	if got := c.ReleaseURL(tid, "1.2.3"); got != "https://updates.example.com"+tp+"1.2.3" {
 		t.Errorf("override = %q (trailing slash must be trimmed)", got)
 	}
 	c = Config{ConsoleListen: "0.0.0.0:443"}
-	if got := c.ReleaseURL("v"); got != "http://localhost:443/agent/releases/v" {
+	if got := c.ReleaseURL(tid, "v"); got != "http://localhost:443"+tp+"v" {
 		t.Errorf("no hostnames = %q", got)
 	}
 	// The version is a path segment: it must be escaped, not pasted raw.
-	if got := c.ReleaseURL("1.0 beta"); got != "http://localhost:443/agent/releases/1.0%20beta" {
+	if got := c.ReleaseURL(tid, "1.0 beta"); got != "http://localhost:443"+tp+"1.0%20beta" {
 		t.Errorf("unescaped version = %q", got)
 	}
 }

@@ -53,7 +53,7 @@ type API struct {
 	Sessions        *auth.Sessions
 	ReleaseDir      string
 	// ReleaseURL builds the URL an agent downloads a release version from.
-	ReleaseURL func(version string) string
+	ReleaseURL func(tenantID uuid.UUID, version string) string
 	// KeyFor resolves per-tenant keys; when nil the Runtime's single keys
 	// are used (single-tenant).
 	KeyFor keyset.Func
@@ -80,7 +80,10 @@ func (a *API) Handler() http.Handler {
 	r.Get("/readyz", a.ready)
 	r.Get("/api/setup/status", a.setupStatus)
 	r.Post("/api/setup", a.setup)
-	r.Get("/agent/releases/{version}", a.downloadRelease)
+	r.Get("/agent/releases/{tenant}/{version}", a.downloadRelease)
+	// Pre-tenant-scoping URL, kept for update commands issued before the
+	// upgrade and for release files uploaded flat by an older server.
+	r.Get("/agent/releases/{version}", a.downloadLegacyRelease)
 	r.Group(func(r chi.Router) {
 		r.Use(a.requireRuntime)
 		r.Post("/api/login", a.login)
