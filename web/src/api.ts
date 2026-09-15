@@ -119,6 +119,37 @@ export type Audit = {
   created_at: string;
 };
 export type Release = { version: string; sha256: string; uploaded_at: string };
+export type RolloutSummary = {
+  targeted: number;
+  already_current: number;
+  issued: number;
+  updated: number;
+  failed: number;
+  remaining: number;
+};
+export type Rollout = {
+  id: string;
+  version: string;
+  group_ids: string[];
+  batch_size: number;
+  max_failures: number;
+  state: "active" | "paused" | "completed" | "cancelled";
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  finished_at: string | null;
+  summary: RolloutSummary;
+};
+export type RolloutDevice = {
+  device_id: string;
+  hostname: string;
+  command_id: string;
+  state: "issued" | "updated" | "failed";
+  detail: string;
+  issued_at: string;
+  resolved_at: string | null;
+};
+export type RolloutDetail = Rollout & { devices: RolloutDevice[] };
 export type Policy = { id: string; name: string; mode: "audit" | "enforce"; created_at: string };
 export type PolicyRule = {
   id: string;

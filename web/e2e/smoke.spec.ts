@@ -95,4 +95,23 @@ test("first-run setup, sign in with MFA, manage groups, rules and admins", async
   await page.getByRole("link", { name: "Approvals" }).click();
   await expect(page.getByRole("heading", { name: "Approvals" })).toBeVisible();
   await expect(page.getByText("No pending requests.")).toBeVisible();
+
+  // Releases: upload a dummy build, start a rollout (no devices → completes
+  // on the next reconcile tick, so assert on the immediate state), cancel.
+  await page.getByRole("link", { name: "Agent releases" }).click();
+  await expect(page.getByRole("heading", { name: "Agent releases" })).toBeVisible();
+  await expect(page.getByText("No rollout in progress.")).toBeVisible();
+  await page.getByLabel("Release version").fill("9.9.9");
+  await page.getByLabel("Agent binary").setInputFiles({ name: "agent.exe", mimeType: "application/octet-stream", buffer: Buffer.from("fake-agent") });
+  await page.getByRole("button", { name: "Upload" }).click();
+  await expect(page.getByRole("cell", { name: "9.9.9", exact: true })).toBeVisible();
+
+  await page.getByLabel("Start rollout of 9.9.9").click();
+  await page.getByLabel("Batch size").fill("2");
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  const card = page.getByTestId("rollout-card");
+  await expect(card).toBeVisible();
+  await expect(card.getByLabel("Rollout state")).toHaveText(/active|completed/);
+  await card.getByRole("button", { name: "Cancel rollout" }).click();
+  await expect(page.getByText("No rollout in progress.")).toBeVisible();
 });
