@@ -33,9 +33,16 @@ func (a *API) routes(r chi.Router) {
 	r.Get("/api/devices/{id}/controls", a.getDeviceControls)
 	r.Get("/api/rollouts", a.listRollouts)
 	r.Get("/api/rollouts/{id}", a.getRollout)
+	r.Get("/api/notifications/status", a.notificationStatus)
+	r.Get("/api/notification-channels", a.listChannels)
+	r.Get("/api/notification-deliveries", a.listDeliveries)
 
 	r.Group(func(r chi.Router) {
 		r.Use(a.requireRole("admin"))
+		r.Post("/api/notification-channels", a.createChannel)
+		r.Patch("/api/notification-channels/{id}", a.updateChannel)
+		r.Delete("/api/notification-channels/{id}", a.deleteChannel)
+		r.Post("/api/notification-channels/{id}/test", a.testChannel)
 		r.Post("/api/devices/{id}/revoke", a.revokeDevice)
 		r.Post("/api/devices/{id}/commands", a.issueCommand)
 		r.Post("/api/groups", a.createGroup)

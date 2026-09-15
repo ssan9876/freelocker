@@ -227,6 +227,7 @@ func (a *App) ActivateForTests(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	a.runCtx = ctx
 	return a.activate(k)
 }
 
