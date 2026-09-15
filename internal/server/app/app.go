@@ -24,6 +24,7 @@ import (
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/keys"
 	"freelocker/internal/server/keyset"
+	"freelocker/internal/server/notify"
 	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/rollout"
 	"freelocker/internal/server/store"
@@ -36,20 +37,22 @@ import (
 )
 
 type App struct {
-	cfg         config.Config
-	store       *store.Store
-	ownsStore   bool
-	master      []byte
-	log         *slog.Logger
-	hub         *hub.Hub
-	handler     http.Handler
-	keyProvider *keyset.Provider
+	cfg          config.Config
+	store        *store.Store
+	ownsStore    bool
+	master       []byte
+	log          *slog.Logger
+	hub          *hub.Hub
+	handler      http.Handler
+	keyProvider  *keyset.Provider
+	notifySealer *keys.Sealer
 
 	setupMu   sync.Mutex
 	mu        sync.Mutex
 	rt        *httpapi.Runtime
 	agentSrv  *grpc.Server
 	agentAddr net.Addr
+	runCtx    context.Context
 }
 
 func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error) {
@@ -80,9 +83,14 @@ func NewWithStore(cfg config.Config, s *store.Store, master []byte, log *slog.Lo
 	if err != nil {
 		return nil, err
 	}
-	a := &App{cfg: cfg, store: s, master: master, log: log, hub: hub.New(), keyProvider: keyset.New(s, master)}
+	notifySealer, err := keys.NewSealer(master, "notify")
+	if err != nil {
+		return nil, err
+	}
+	a := &App{cfg: cfg, store: s, master: master, log: log, hub: hub.New(), keyProvider: keyset.New(s, master), notifySealer: notifySealer}
 	api := &httpapi.API{
 		Store: s, Runtime: a.runtime, Setup: a.setup, ProvisionTenant: a.ProvisionTenant, Hub: a.hub, TOTPSealer: totpSealer,
+		NotifySealer: notifySealer, SMTPConfigured: cfg.SMTPConfigured(),
 		Sessions: &auth.Sessions{Store: s, Secure: !cfg.InsecureCookies}, ReleaseDir: cfg.ReleaseDir,
 		ReleaseURL: cfg.ReleaseURL, KeyFor: a.keyProvider.For, Log: log,
 	}
@@ -267,24 +275,31 @@ func (a *App) activate(k *bootstrap.Keys) error {
 	} else if n > 0 {
 		a.log.Info("recompiled policies", "count", n)
 	}
+	notifier := notify.New(a.store, a.notifySealer, a.cfg.SMTP, a.log)
 	rollouts := &rollout.Service{
 		Store: a.store, Commands: cmds, Online: a.hub.Connected, ReleaseURL: a.cfg.ReleaseURL,
-		ConfirmTimeout: rollout.DefaultConfirmTimeout, Log: a.log,
+		ConfirmTimeout: rollout.DefaultConfirmTimeout, Log: a.log, Notify: notifier,
 	}
 	alerts := alerting.New(a.store)
+	alerts.Notify = notifier
 	tlsCfg := agentapi.NewTenantTLS(a.keyProvider, a.store, a.cfg.PublicHostnames, time.Now).Config()
 	lis, err := net.Listen("tcp", a.cfg.AgentListen)
 	if err != nil {
 		return fmt.Errorf("agent listener: %w", err)
 	}
-	srv := agentapi.NewGRPCServer(agentapi.Deps{Store: a.store, Keys: k, KeyFor: a.keyProvider.For, Hub: a.hub, Commands: cmds, Policy: policy, Alerting: alerts, Log: a.log}, tlsCfg)
+	srv := agentapi.NewGRPCServer(agentapi.Deps{Store: a.store, Keys: k, KeyFor: a.keyProvider.For, Hub: a.hub, Commands: cmds, Policy: policy, Alerting: alerts, Notify: notifier, Log: a.log}, tlsCfg)
 	go func() {
 		if err := srv.Serve(lis); err != nil {
 			a.log.Error("agent API stopped", "err", err)
 		}
 	}()
+	runCtx := a.runCtx
+	if runCtx == nil {
+		runCtx = context.Background()
+	}
+	go notifier.Run(runCtx)
 	a.mu.Lock()
-	a.rt = &httpapi.Runtime{Keys: k, Commands: cmds, Policy: policy, Rollouts: rollouts}
+	a.rt = &httpapi.Runtime{Keys: k, Commands: cmds, Policy: policy, Rollouts: rollouts, Notify: notifier}
 	a.agentSrv, a.agentAddr = srv, lis.Addr()
 	a.mu.Unlock()
 	a.log.Info("agent API listening", "addr", lis.Addr().String(), "ca_pin", k.CA.Pin())
@@ -292,6 +307,7 @@ func (a *App) activate(k *bootstrap.Keys) error {
 }
 
 func (a *App) Run(ctx context.Context) error {
+	a.runCtx = ctx
 	k, err := bootstrap.Load(ctx, a.store, a.master)
 	switch {
 	case err == nil:
@@ -355,6 +371,9 @@ func (a *App) Run(ctx context.Context) error {
 				}
 				if err := rt.Rollouts.Tick(ctx); err != nil {
 					a.log.Error("rollout tick", "err", err)
+				}
+				if _, _, err := rt.Notify.Dispatch(ctx); err != nil {
+					a.log.Error("notify dispatch", "err", err)
 				}
 			}
 			// Housekeeping: drop login failures older than the rate-limit window.

@@ -25,7 +25,7 @@ type testServer struct {
 	Token string // valid unlimited install token
 }
 
-func startServer(t *testing.T) *testServer {
+func startServer(t *testing.T, opts ...func(*agentapi.Deps)) *testServer {
 	t.Helper()
 	ctx := context.Background()
 	s := storetest.New(t)
@@ -44,6 +44,9 @@ func startServer(t *testing.T) *testServer {
 
 	kp := keyset.New(s, master)
 	d := newDeps(s, k, kp)
+	for _, opt := range opts {
+		opt(&d)
+	}
 	tlsCfg := agentapi.NewTenantTLS(kp, s, []string{"127.0.0.1"}, time.Now).Config()
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

@@ -119,7 +119,7 @@ func TestApproveAsPublisher(t *testing.T) {
 	c.do("POST", "/api/policies/"+pol.ID+"/assign", map[string]string{"group_id": grp.ID}, nil)
 	c.do("POST", "/api/devices/"+dev.String()+"/group", map[string]any{"group_id": grp.ID}, nil)
 
-	if err := e.store.UpsertApprovalRequests(ctx, tenant, mustParseUUID(t, pol.ID), dev, []store.BlockEvent{{
+	if _, err := e.store.UpsertApprovalRequests(ctx, tenant, mustParseUUID(t, pol.ID), dev, []store.BlockEvent{{
 		SHA256: "CC33", Path: `C:\blocked.exe`, Signer: "Contoso Ltd", SignerTBS: testTBS, SignerVerified: true, At: time.Now(),
 	}}); err != nil {
 		t.Fatal(err)

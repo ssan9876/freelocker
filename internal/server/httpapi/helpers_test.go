@@ -14,10 +14,12 @@ import (
 	"freelocker/internal/server/auth"
 	"freelocker/internal/server/bootstrap"
 	"freelocker/internal/server/commands"
+	"freelocker/internal/server/config"
 	"freelocker/internal/server/httpapi"
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/keys"
 	"freelocker/internal/server/keyset"
+	"freelocker/internal/server/notify"
 	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/rollout"
 	"freelocker/internal/server/store"
@@ -44,6 +46,7 @@ func newEnv(t *testing.T) *env {
 	s := storetest.New(t)
 	master := bytes.Repeat([]byte{3}, 32)
 	sealer, _ := keys.NewSealer(master, "totp")
+	notifySealer, _ := keys.NewSealer(master, "notify")
 	h := hub.New()
 	var mu sync.Mutex
 	var rt *httpapi.Runtime
@@ -51,7 +54,8 @@ func newEnv(t *testing.T) *env {
 	e.rt = func() *httpapi.Runtime { mu.Lock(); defer mu.Unlock(); return rt }
 
 	api := &httpapi.API{
-		Store: s, Hub: h, TOTPSealer: sealer, Sessions: &auth.Sessions{Store: s}, Runtime: e.rt, ReleaseDir: t.TempDir(),
+		Store: s, Hub: h, TOTPSealer: sealer, NotifySealer: notifySealer, SMTPConfigured: false,
+		Sessions: &auth.Sessions{Store: s}, Runtime: e.rt, ReleaseDir: t.TempDir(),
 		ReleaseURL: func(v string) string { return "http://test.local/agent/releases/" + v },
 		KeyFor:     keyset.New(s, master).For,
 		Setup: func(ctx context.Context, org, email, pw string) error {
@@ -77,6 +81,7 @@ func newEnv(t *testing.T) *env {
 				Commands: cmds,
 				Policy:   &policysvc.Service{Store: s, Keys: k},
 				Rollouts: &rollout.Service{Store: s, Commands: cmds, Online: h.Connected, ReleaseURL: func(v string) string { return "http://test.local/agent/releases/" + v }},
+				Notify:   notify.New(s, notifySealer, config.SMTP{}, nil),
 			}
 			mu.Unlock()
 			return nil

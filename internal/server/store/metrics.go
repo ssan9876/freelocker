@@ -134,11 +134,15 @@ func (s *Store) RaiseAlert(ctx context.Context, tenantID, deviceID, ruleID uuid.
 	return tag.RowsAffected() == 1, nil
 }
 
-// ResolveAlert closes the open alert for a device+rule, if any.
-func (s *Store) ResolveAlert(ctx context.Context, tenantID, deviceID, ruleID uuid.UUID, now time.Time) error {
-	_, err := s.pool.Exec(ctx, `UPDATE alerts SET resolved_at=$4
+// ResolveAlert closes the open alert for a device+rule, if any. Returns
+// true when an alert was actually closed.
+func (s *Store) ResolveAlert(ctx context.Context, tenantID, deviceID, ruleID uuid.UUID, now time.Time) (bool, error) {
+	tag, err := s.pool.Exec(ctx, `UPDATE alerts SET resolved_at=$4
 		WHERE tenant_id=$1 AND device_id=$2 AND rule_id=$3 AND resolved_at IS NULL`, tenantID, deviceID, ruleID, now)
-	return err
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
 }
 
 func (s *Store) ListAlerts(ctx context.Context, tenantID uuid.UUID, limit int) ([]Alert, error) {

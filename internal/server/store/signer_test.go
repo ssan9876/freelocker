@@ -72,7 +72,7 @@ func TestBlockEventsAndApprovalsCarryPublisher(t *testing.T) {
 	if err != nil || len(list) != 1 || list[0].SignerTBS != "FEED" || !list[0].SignerVerified {
 		t.Fatalf("block events = %+v, %v", list, err)
 	}
-	if err := s.UpsertApprovalRequests(ctx, tenant, pid, dev, evs); err != nil {
+	if _, err := s.UpsertApprovalRequests(ctx, tenant, pid, dev, evs); err != nil {
 		t.Fatal(err)
 	}
 	reqs, err := s.ListApprovalRequests(ctx, tenant, "pending", 10)

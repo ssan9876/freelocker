@@ -17,7 +17,7 @@ func (e *env) seedApproval(t *testing.T, policyID, sha string) string {
 	ctx := context.Background()
 	tenant := e.rt().Keys.TenantID
 	dev := e.fakeDevice(t)
-	if err := e.store.UpsertApprovalRequests(ctx, tenant, uuid.MustParse(policyID), dev, []store.BlockEvent{
+	if _, err := e.store.UpsertApprovalRequests(ctx, tenant, uuid.MustParse(policyID), dev, []store.BlockEvent{
 		{SHA256: sha, Path: `C:\new.exe`, At: time.Now()},
 	}); err != nil {
 		t.Fatal(err)

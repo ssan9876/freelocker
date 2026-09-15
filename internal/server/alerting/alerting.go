@@ -9,16 +9,24 @@ import (
 	"fmt"
 	"time"
 
+	"freelocker/internal/server/notify"
 	"freelocker/internal/server/store"
 
 	"github.com/google/uuid"
 )
 
 type Service struct {
-	Store *store.Store
+	Store  *store.Store
+	Notify notify.Emitter
 }
 
 func New(s *store.Store) *Service { return &Service{Store: s} }
+
+func (s *Service) emit(ctx context.Context, e notify.Event) {
+	if s.Notify != nil {
+		s.Notify.Emit(ctx, e)
+	}
+}
 
 func metricValue(m string, sample store.MetricSample) (float64, bool) {
 	switch m {
@@ -63,16 +71,24 @@ func (s *Service) Evaluate(ctx context.Context, tenantID, deviceID uuid.UUID, sa
 			}
 			if sustained {
 				msg := fmt.Sprintf("%s %.0f%% %s %.0f%%", r.Metric, value, opWord(r.Op), r.Threshold)
-				if _, err := s.Store.RaiseAlert(ctx, tenantID, deviceID, r.ID, r.Metric, msg, now); err != nil {
+				created, err := s.Store.RaiseAlert(ctx, tenantID, deviceID, r.ID, r.Metric, msg, now)
+				if err != nil {
 					return err
+				}
+				if created {
+					s.emit(ctx, s.alertEvent(ctx, "alert.raised", tenantID, deviceID, r, msg, now))
 				}
 			}
 		} else {
 			if err := s.Store.ClearBreach(ctx, tenantID, deviceID, r.ID); err != nil {
 				return err
 			}
-			if err := s.Store.ResolveAlert(ctx, tenantID, deviceID, r.ID, now); err != nil {
+			closed, err := s.Store.ResolveAlert(ctx, tenantID, deviceID, r.ID, now)
+			if err != nil {
 				return err
+			}
+			if closed {
+				s.emit(ctx, s.alertEvent(ctx, "alert.resolved", tenantID, deviceID, r, "", now))
 			}
 		}
 	}
@@ -86,6 +102,23 @@ func opWord(op string) string {
 		return "<"
 	}
 	return ">"
+}
+
+func (s *Service) alertEvent(ctx context.Context, kind string, tenantID, deviceID uuid.UUID, r store.AlertRule, msg string, now time.Time) notify.Event {
+	host := deviceID.String()
+	if d, err := s.Store.GetDevice(ctx, tenantID, deviceID); err == nil && d.Hostname != "" {
+		host = d.Hostname
+	}
+	title := fmt.Sprintf("Alert: %s on %s", r.Name, host)
+	body := fmt.Sprintf("%s is %s on %s.", r.Name, map[string]string{"alert.raised": "breaching", "alert.resolved": "resolved"}[kind], host)
+	if msg != "" {
+		body += "\n" + msg
+	}
+	if kind == "alert.resolved" {
+		title = fmt.Sprintf("Resolved: %s on %s", r.Name, host)
+	}
+	return notify.Event{Kind: kind, TenantID: tenantID, Title: title, Body: body, At: now,
+		Detail: map[string]any{"device_id": deviceID.String(), "hostname": host, "rule_id": r.ID.String(), "rule_name": r.Name, "metric": r.Metric, "message": msg}}
 }
 
 // sustained reports whether a breach has held for at least duration. For

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"freelocker/internal/server/commands"
+	"freelocker/internal/server/notify"
 	"freelocker/internal/server/store"
 
 	"github.com/google/uuid"
@@ -29,6 +30,13 @@ type Service struct {
 	// may keep reporting the old version before it counts as failed.
 	ConfirmTimeout time.Duration
 	Log            *slog.Logger
+	Notify         notify.Emitter
+}
+
+func (s *Service) emit(ctx context.Context, e notify.Event) {
+	if s.Notify != nil {
+		s.Notify.Emit(ctx, e)
+	}
 }
 
 func (s *Service) now() time.Time {
@@ -101,6 +109,10 @@ func (s *Service) Reconcile(ctx context.Context, tenantID uuid.UUID, r store.Rol
 			s.log().Error("rollout audit", "rollout", r.ID, "action", "rollout.auto_pause", "err", err)
 		}
 		s.log().Warn("rollout auto-paused", "rollout", r.ID, "failed", sum.Failed)
+		s.emit(ctx, notify.Event{Kind: "rollout.auto_paused", TenantID: tenantID, At: now,
+			Title:  fmt.Sprintf("Rollout of %s auto-paused after %d failures", r.Version, sum.Failed),
+			Body:   fmt.Sprintf("The rollout of agent %s was paused automatically: %d devices failed to update (threshold %d). Review the failures in the console, then resume or roll back.", r.Version, sum.Failed, r.MaxFailures),
+			Detail: map[string]any{"rollout_id": r.ID.String(), "version": r.Version, "failed": sum.Failed, "max_failures": r.MaxFailures}})
 		return nil
 	}
 
@@ -143,6 +155,10 @@ func (s *Service) Reconcile(ctx context.Context, tenantID uuid.UUID, r store.Rol
 			return fmt.Errorf("complete: %w", err)
 		}
 		s.log().Info("rollout completed", "rollout", r.ID, "version", r.Version, "updated", sum.Updated, "failed", sum.Failed)
+		s.emit(ctx, notify.Event{Kind: "rollout.completed", TenantID: tenantID, At: now,
+			Title:  fmt.Sprintf("Rollout of %s completed", r.Version),
+			Body:   fmt.Sprintf("Agent %s reached every targeted device: %d updated, %d failed.", r.Version, sum.Updated, sum.Failed),
+			Detail: map[string]any{"rollout_id": r.ID.String(), "version": r.Version, "updated": sum.Updated, "failed": sum.Failed}})
 	}
 	return nil
 }

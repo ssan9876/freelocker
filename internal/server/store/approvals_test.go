@@ -22,7 +22,7 @@ func TestApprovalRequestsAggregate(t *testing.T) {
 	t0 := time.Now().Add(-time.Hour).Truncate(time.Second)
 
 	// One batch: two events for AA (first with no signer), one event with no hash.
-	err := s.UpsertApprovalRequests(ctx, tenant, pol, dev1, []store.BlockEvent{
+	_, err := s.UpsertApprovalRequests(ctx, tenant, pol, dev1, []store.BlockEvent{
 		{SHA256: "AA", Path: `C:\a.exe`, At: t0},
 		{SHA256: "AA", Path: `C:\a.exe`, Signer: "Acme", At: t0.Add(time.Minute)},
 		{SHA256: "", Path: `C:\nohash.exe`, At: t0},
@@ -51,7 +51,7 @@ func TestApprovalRequestsAggregate(t *testing.T) {
 	if n, _ := s.CountPendingApprovals(ctx, tenant); n != 1 {
 		t.Errorf("pending count = %d", n)
 	}
-	if err := s.UpsertApprovalRequests(ctx, tenant, pol, dev1, nil); err != nil {
+	if _, err := s.UpsertApprovalRequests(ctx, tenant, pol, dev1, nil); err != nil {
 		t.Errorf("empty batch should be a no-op: %v", err)
 	}
 }
@@ -123,5 +123,22 @@ func TestExpireApprovalRequests(t *testing.T) {
 	expired, _ := s.ListApprovalRequests(ctx, tenant, "expired", 10)
 	if len(expired) != 1 || expired[0].SHA256 != "OLD" {
 		t.Errorf("expired list = %+v", expired)
+	}
+}
+
+func TestUpsertApprovalRequestsReportsNew(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	pol, _ := s.CreatePolicy(ctx, tenant, "Baseline", "audit")
+	dev := seedDevice(t, s, tenant)
+	ev := []store.BlockEvent{{SHA256: "AA", Path: `C:\a.exe`, At: time.Now()}}
+	first, err := s.UpsertApprovalRequests(ctx, tenant, pol, dev, ev)
+	if err != nil || len(first) != 1 {
+		t.Fatalf("first = %v, %v", first, err)
+	}
+	again, err := s.UpsertApprovalRequests(ctx, tenant, pol, dev, ev)
+	if err != nil || len(again) != 0 {
+		t.Fatalf("second upsert must report nothing new: %v, %v", again, err)
 	}
 }

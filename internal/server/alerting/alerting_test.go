@@ -6,11 +6,16 @@ import (
 	"time"
 
 	"freelocker/internal/server/alerting"
+	"freelocker/internal/server/notify"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/store/storetest"
 
 	"github.com/google/uuid"
 )
+
+type recEmitter struct{ events []notify.Event }
+
+func (r *recEmitter) Emit(_ context.Context, e notify.Event) { r.events = append(r.events, e) }
 
 func seedDevice(t *testing.T, s *store.Store, tenant uuid.UUID) uuid.UUID {
 	t.Helper()
@@ -78,5 +83,27 @@ func TestSustainedDurationRequiresTime(t *testing.T) {
 	svc.Evaluate(ctx, tenant, dev, store.MetricSample{DiskPct: 92}, t0.Add(7*time.Minute))
 	if _, err := s.OpenAlertFor(ctx, tenant, dev, other); err == nil {
 		t.Error("lt rule should not fire when value is above threshold")
+	}
+}
+
+func TestEvaluateEmitsOnTransitionsOnly(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	dev := seedDevice(t, s, tenant)
+	s.CreateAlertRule(ctx, tenant, store.AlertRule{Name: "High CPU", Metric: "cpu", Op: "gt", Threshold: 90, Enabled: true})
+	rec := &recEmitter{}
+	svc := alerting.New(s)
+	svc.Notify = rec
+	now := time.Now()
+	svc.Evaluate(ctx, tenant, dev, store.MetricSample{CPUPct: 95}, now)
+	svc.Evaluate(ctx, tenant, dev, store.MetricSample{CPUPct: 96}, now.Add(time.Second)) // still breaching: no new event
+	svc.Evaluate(ctx, tenant, dev, store.MetricSample{CPUPct: 10}, now.Add(time.Minute))
+	svc.Evaluate(ctx, tenant, dev, store.MetricSample{CPUPct: 10}, now.Add(2*time.Minute)) // still fine: no event
+	if len(rec.events) != 2 || rec.events[0].Kind != "alert.raised" || rec.events[1].Kind != "alert.resolved" {
+		t.Fatalf("events = %+v", rec.events)
+	}
+	if rec.events[0].Detail["hostname"] != "pc" || rec.events[0].Detail["rule_name"] != "High CPU" || rec.events[0].Title != "Alert: High CPU on pc" {
+		t.Errorf("raised event = %+v", rec.events[0])
 	}
 }

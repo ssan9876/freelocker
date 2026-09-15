@@ -7,6 +7,8 @@ import (
 	"time"
 
 	flv1 "freelocker/gen/freelocker/v1"
+	"freelocker/internal/server/agentapi"
+	"freelocker/internal/server/notify"
 	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/tokens"
@@ -16,6 +18,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
+
+type recEmitter struct{ events []notify.Event }
+
+func (r *recEmitter) Emit(_ context.Context, e notify.Event) { r.events = append(r.events, e) }
 
 func agentClient(t *testing.T, ts *testServer, id *sim.Identity) flv1.AgentClient {
 	t.Helper()
@@ -95,6 +101,53 @@ func TestGetPolicyObserveAndReportBlocks(t *testing.T) {
 	reqs, err := ts.Deps.Store.ListApprovalRequests(ctx, tenant, "pending", 10)
 	if err != nil || len(reqs) != 1 || reqs[0].SHA256 != "BB" || reqs[0].PolicyID != pid || reqs[0].DeviceCount != 1 {
 		t.Fatalf("approval requests = %+v, %v", reqs, err)
+	}
+}
+
+func TestReportBlocksEmitsApprovalNew(t *testing.T) {
+	ctx := context.Background()
+	rec := &recEmitter{}
+	ts := startServer(t, func(d *agentapi.Deps) { d.Notify = rec })
+	tenant := ts.Deps.Keys.TenantID
+	svc := &policysvc.Service{Store: ts.Deps.Store, Keys: ts.Deps.Keys}
+
+	gid, _ := ts.Deps.Store.CreateDeviceGroup(ctx, tenant, "WS")
+	pid, _ := ts.Deps.Store.CreatePolicy(ctx, tenant, "Baseline", "audit")
+	hash64 := ""
+	for i := 0; i < 64; i++ {
+		hash64 += "A"
+	}
+	ts.Deps.Store.AddRule(ctx, tenant, pid, store.PolicyRule{Kind: "hash", Value: hash64}, nil)
+	if _, err := svc.Recompile(ctx, tenant, pid); err != nil {
+		t.Fatal(err)
+	}
+	ts.Deps.Store.AssignPolicy(ctx, tenant, gid, pid)
+
+	full, hash, _ := tokens.Generate(ts.Deps.Keys.CA.Pin())
+	ts.Deps.Store.CreateInstallToken(ctx, tenant, store.InstallToken{Name: "ws", GroupID: &gid}, hash)
+	id, err := sim.Enroll(ctx, ts.Addr, full, hw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := agentClient(t, ts, id)
+
+	if _, err := client.ReportBlocks(ctx, &flv1.ReportBlocksRequest{Events: []*flv1.BlockEvent{
+		{Sha256: "BB", Path: `C:\bad.exe`, Blocked: false, AtUnix: time.Now().Unix()},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.events) != 1 || rec.events[0].Kind != "approval.new" {
+		t.Fatalf("events after first report = %+v", rec.events)
+	}
+
+	// A repeat of the same hash must not emit again.
+	if _, err := client.ReportBlocks(ctx, &flv1.ReportBlocksRequest{Events: []*flv1.BlockEvent{
+		{Sha256: "BB", Path: `C:\bad.exe`, Blocked: false, AtUnix: time.Now().Unix()},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.events) != 1 {
+		t.Fatalf("events after repeat report = %+v, want still 1", rec.events)
 	}
 }
 

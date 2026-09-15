@@ -3,15 +3,28 @@ package agentapi
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	flv1 "freelocker/gen/freelocker/v1"
+	"freelocker/internal/server/notify"
 	"freelocker/internal/server/store"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// baseName returns the final path component, splitting on both '\' and '/'
+// so a Windows path is handled correctly even when running on Linux (where
+// filepath.Base would not split on '\').
+func baseName(p string) string {
+	if i := strings.LastIndexAny(p, `\/`); i >= 0 {
+		return p[i+1:]
+	}
+	return p
+}
 
 func (s *agentService) GetPolicy(ctx context.Context, _ *flv1.GetPolicyRequest) (*flv1.GetPolicyResponse, error) {
 	dev := deviceFrom(ctx)
@@ -78,8 +91,27 @@ func (s *agentService) queueApprovals(ctx context.Context, tenantID, deviceID uu
 		s.d.Log.Error("resolve policy for approvals", "device", deviceID, "err", err)
 		return
 	}
-	if err := s.d.Store.UpsertApprovalRequests(ctx, tenantID, pv.PolicyID, deviceID, events); err != nil {
+	newIDs, err := s.d.Store.UpsertApprovalRequests(ctx, tenantID, pv.PolicyID, deviceID, events)
+	if err != nil {
 		s.d.Log.Error("queue approval requests", "device", deviceID, "err", err)
+		return
+	}
+	if s.d.Notify == nil || len(newIDs) == 0 {
+		return
+	}
+	host := deviceID.String()
+	if d, err := s.d.Store.GetDevice(ctx, tenantID, deviceID); err == nil && d.Hostname != "" {
+		host = d.Hostname
+	}
+	for _, id := range newIDs {
+		req, err := s.d.Store.GetApprovalRequest(ctx, tenantID, id)
+		if err != nil {
+			continue
+		}
+		s.d.Notify.Emit(ctx, notify.Event{Kind: "approval.new", TenantID: tenantID, At: req.FirstSeen,
+			Title:  fmt.Sprintf("Approval requested: %s on %s", baseName(req.Path), host),
+			Body:   fmt.Sprintf("%s was blocked on %s by policy %s and is waiting for approval.\nPath: %s\nSigner: %s", baseName(req.Path), host, req.PolicyName, req.Path, req.Signer),
+			Detail: map[string]any{"request_id": id.String(), "policy_id": req.PolicyID.String(), "policy_name": req.PolicyName, "sha256": req.SHA256, "path": req.Path, "signer": req.Signer, "device_id": deviceID.String(), "hostname": host}})
 	}
 }
 

@@ -26,7 +26,7 @@ type ApprovalRequest struct {
 // requests for policyID, one per hash. Events without a hash are skipped.
 // Existing requests accumulate counts and timestamps; their status is never
 // changed, so a decided hash stays decided.
-func (s *Store) UpsertApprovalRequests(ctx context.Context, tenantID, policyID, deviceID uuid.UUID, events []BlockEvent) error {
+func (s *Store) UpsertApprovalRequests(ctx context.Context, tenantID, policyID, deviceID uuid.UUID, events []BlockEvent) ([]uuid.UUID, error) {
 	type agg struct {
 		path, signer   string
 		signerTBS      string
@@ -69,17 +69,19 @@ func (s *Store) UpsertApprovalRequests(ctx context.Context, tenantID, policyID, 
 		}
 	}
 	if len(order) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer tx.Rollback(ctx)
+	var inserted []uuid.UUID
 	for _, h := range order {
 		a := byHash[h]
 		var id uuid.UUID
+		var isNew bool
 		err := tx.QueryRow(ctx, `
 			INSERT INTO approval_requests (id, tenant_id, policy_id, sha256, path, signer, signer_tbs, signer_verified, event_count, first_seen, last_seen)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
@@ -91,24 +93,27 @@ func (s *Store) UpsertApprovalRequests(ctx context.Context, tenantID, policyID, 
 				signer = CASE WHEN approval_requests.signer = '' THEN EXCLUDED.signer ELSE approval_requests.signer END,
 				signer_tbs = CASE WHEN approval_requests.signer_tbs = '' THEN EXCLUDED.signer_tbs ELSE approval_requests.signer_tbs END,
 				signer_verified = (approval_requests.signer_verified OR EXCLUDED.signer_verified)
-			RETURNING id`,
-			uuid.New(), tenantID, policyID, h, a.path, a.signer, a.signerTBS, a.signerVerified, a.n, a.first, a.last).Scan(&id)
+			RETURNING id, (xmax = 0)`,
+			uuid.New(), tenantID, policyID, h, a.path, a.signer, a.signerTBS, a.signerVerified, a.n, a.first, a.last).Scan(&id, &isNew)
 		if err != nil {
-			return err
+			return nil, err
+		}
+		if isNew {
+			inserted = append(inserted, id)
 		}
 		tag, err := tx.Exec(ctx, `
 			INSERT INTO approval_request_devices (request_id, device_id) VALUES ($1,$2)
 			ON CONFLICT DO NOTHING`, id, deviceID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if tag.RowsAffected() == 1 {
 			if _, err := tx.Exec(ctx, `UPDATE approval_requests SET device_count = device_count + 1 WHERE id=$1`, id); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
-	return tx.Commit(ctx)
+	return inserted, tx.Commit(ctx)
 }
 
 const approvalSelect = `

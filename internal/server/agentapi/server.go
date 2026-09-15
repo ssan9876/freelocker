@@ -13,6 +13,7 @@ import (
 	"freelocker/internal/server/bootstrap"
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/keyset"
+	"freelocker/internal/server/notify"
 	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/store"
 
@@ -30,6 +31,7 @@ type Deps struct {
 	Commands CommandSink        // optional
 	Policy   *policysvc.Service // optional; enables GetPolicy
 	Alerting *alerting.Service  // optional; evaluates metrics on report
+	Notify   notify.Emitter     // optional
 	// KeyFor, when set, resolves per-tenant keys (multi-tenant); otherwise
 	// the single Keys is used for enrollment and certificate renewal.
 	KeyFor keyset.Func

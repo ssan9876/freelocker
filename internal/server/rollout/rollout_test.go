@@ -9,12 +9,17 @@ import (
 	"freelocker/internal/server/bootstrap"
 	"freelocker/internal/server/commands"
 	"freelocker/internal/server/hub"
+	"freelocker/internal/server/notify"
 	"freelocker/internal/server/rollout"
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/store/storetest"
 
 	"github.com/google/uuid"
 )
+
+type recEmitter struct{ events []notify.Event }
+
+func (r *recEmitter) Emit(_ context.Context, e notify.Event) { r.events = append(r.events, e) }
 
 type fixture struct {
 	s      *store.Store
@@ -200,6 +205,61 @@ func TestAutoPauseOnFailures(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected a rollout.auto_pause audit entry")
+	}
+}
+
+func TestRolloutEmitsPauseAndCompletion(t *testing.T) {
+	// Auto-pause.
+	f := newFixture(t)
+	rec := &recEmitter{}
+	f.svc.Notify = rec
+	a := f.device(t, "a", "1.0.0", true)
+	b := f.device(t, "b", "1.0.0", true)
+	f.device(t, "c", "1.0.0", true)
+	r := f.rollout(t, 2, 2)
+	ctx := context.Background()
+
+	f.tick(t)
+	for _, d := range []uuid.UUID{a, b} {
+		row := f.commandFor(t, r.ID, d)
+		f.s.CompleteCommand(ctx, f.tenant, d, row.CommandID, false, "hash mismatch", f.now)
+	}
+	f.tick(t)
+	var paused []notify.Event
+	for _, e := range rec.events {
+		if e.Kind == "rollout.auto_paused" {
+			paused = append(paused, e)
+		}
+	}
+	if len(paused) != 1 || paused[0].Detail["failed"] != 2 {
+		t.Fatalf("auto_paused events = %+v", paused)
+	}
+
+	// Completion.
+	f2 := newFixture(t)
+	rec2 := &recEmitter{}
+	f2.svc.Notify = rec2
+	a2 := f2.device(t, "a", "1.0.0", true)
+	b2 := f2.device(t, "b", "1.0.0", true)
+	f2.device(t, "c-current", "2.0.0", true)
+	r2 := f2.rollout(t, 10, 0)
+
+	f2.tick(t)
+	for _, d := range []uuid.UUID{a2, b2} {
+		row := f2.commandFor(t, r2.ID, d)
+		f2.s.CompleteCommand(ctx, f2.tenant, d, row.CommandID, true, "ok", f2.now)
+		f2.s.RecordHeartbeat(ctx, f2.tenant, d, store.Inventory{AgentVersion: "2.0.0"}, f2.now)
+	}
+	f2.now = f2.now.Add(time.Minute)
+	f2.tick(t)
+	var completed []notify.Event
+	for _, e := range rec2.events {
+		if e.Kind == "rollout.completed" {
+			completed = append(completed, e)
+		}
+	}
+	if len(completed) != 1 {
+		t.Fatalf("completed events = %+v", completed)
 	}
 }
 

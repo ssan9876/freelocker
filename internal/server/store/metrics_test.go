@@ -57,7 +57,7 @@ func TestAlertRulesAndRaiseResolve(t *testing.T) {
 		t.Fatalf("open alert missing: %v", err)
 	}
 
-	if err := s.ResolveAlert(ctx, tenant, dev, rid, now.Add(time.Minute)); err != nil {
+	if _, err := s.ResolveAlert(ctx, tenant, dev, rid, now.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.OpenAlertFor(ctx, tenant, dev, rid); !errors.Is(err, store.ErrNotFound) {
@@ -71,5 +71,21 @@ func TestAlertRulesAndRaiseResolve(t *testing.T) {
 	list, _ := s.ListAlerts(ctx, tenant, 10)
 	if len(list) != 2 {
 		t.Fatalf("alerts history = %d, want 2", len(list))
+	}
+}
+
+func TestResolveAlertReportsClosed(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	dev := seedDevice(t, s, tenant)
+	rid, _ := s.CreateAlertRule(ctx, tenant, store.AlertRule{Name: "r", Metric: "cpu", Op: "gt", Threshold: 1, Enabled: true})
+	now := time.Now()
+	s.RaiseAlert(ctx, tenant, dev, rid, "cpu", "m", now)
+	if ok, err := s.ResolveAlert(ctx, tenant, dev, rid, now); err != nil || !ok {
+		t.Fatalf("first resolve = %v, %v", ok, err)
+	}
+	if ok, _ := s.ResolveAlert(ctx, tenant, dev, rid, now); ok {
+		t.Error("second resolve must report false")
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"freelocker/internal/server/hub"
 	"freelocker/internal/server/keys"
 	"freelocker/internal/server/keyset"
+	"freelocker/internal/server/notify"
 	"freelocker/internal/server/policysvc"
 	"freelocker/internal/server/rollout"
 	"freelocker/internal/server/store"
@@ -35,6 +36,7 @@ type Runtime struct {
 	Commands *commands.Service
 	Policy   *policysvc.Service
 	Rollouts *rollout.Service
+	Notify   *notify.Service
 }
 
 type API struct {
@@ -46,6 +48,8 @@ type API struct {
 	ProvisionTenant func(ctx context.Context, org, ownerEmail, ownerPassword string) (uuid.UUID, error)
 	Hub             *hub.Hub
 	TOTPSealer      *keys.Sealer
+	NotifySealer    *keys.Sealer
+	SMTPConfigured  bool
 	Sessions        *auth.Sessions
 	ReleaseDir      string
 	// ReleaseURL builds the URL an agent downloads a release version from.
