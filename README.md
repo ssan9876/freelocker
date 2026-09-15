@@ -19,7 +19,7 @@ Agent (freelocker-agent, Windows service, SYSTEM)
   resource metrics · USB storage control · self-update (staged rollouts with pause/rollback) · self-protection
 Console (React SPA, embedded in the server)
   setup · login + TOTP · devices · policies · blocked programs · alerts
-  install tokens · groups + controls · admins · agent releases · audit log
+  install tokens · groups + controls · admins · agent releases · audit log · email + webhook notifications
 ```
 
 Design decision throughout: enforcement sits behind an `Enforcer`

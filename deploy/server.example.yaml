@@ -18,3 +18,13 @@ release_dir: releases          # directory where agent releases are stored
 release_base_url: ""           # URL agents download releases from (default: https://<first public hostname>:<console port>; http when the console has no TLS). Set it when the console sits behind a proxy or uses a self-signed cert.
 metrics_retention_days: 30  # delete metrics/block-events/resolved-alerts older than this many days (0 disables)
 approval_expiry_days: 30    # pending approval requests idle this long become expired (0 disables)
+# Email notifications (SMTP).
+# Channels cannot be created until host and from are both set.
+# Each key can be overridden by env var: FREELOCKER_SMTP_<UPPER_SNAKE_KEY>.
+# smtp:
+#   host: smtp.example.com
+#   port: 587
+#   username: notifications@example.com
+#   password: ""             # override with FREELOCKER_SMTP_PASSWORD
+#   from: notifications@example.com
+#   starttls: true

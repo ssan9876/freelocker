@@ -25,3 +25,9 @@ the device's uninstall code from the console.
 3. Within a minute the card shows 1 in flight; the agent downloads, stages, and the swap helper restarts the service. On the next heartbeat the device reports 0.2.2 and the card shows 1 updated → state completed.
 4. Roll back: pick 0.2.1 in **Roll back to** and click **Roll back**. The old rollout shows as cancelled in history and a new one runs to 0.2.1.
 5. Failure path: upload a build whose file you then delete from `release_dir`. Start a rollout; the agent's download 404s, the device shows failed with the agent's message, and the rollout auto-pauses.
+
+## Notifications
+
+1. **Webhook channel:** On the Notifications page, create a webhook channel pointed at a request-bin style URL (e.g., https://webhook.site/<unique-id>). Press **Test send** and confirm the webhook receives a POST with headers `X-FreeLocker-Event`, `X-FreeLocker-Delivery`, and `X-FreeLocker-Signature: sha256=<hex HMAC-SHA256>` (when a signing secret is set).
+2. **Alert rule:** Create an alert rule with a CPU % threshold of 1 so a real agent running on the VM immediately trips it. Confirm the signed POST arrives on the webhook with event kind `alert.raised`.
+3. **Rollout auto-pause:** Run the staged rollout failure drill (step 5 above). When the rollout auto-pauses due to the download failure, confirm that email and/or webhook notifications fire with event kind `rollout.auto_paused`.
