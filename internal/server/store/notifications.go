@@ -150,3 +150,105 @@ func (s *Store) ChannelsForEvent(ctx context.Context, tenantID uuid.UUID, kind s
 		ORDER BY c.name`, tenantID, kind)
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (NotificationChannel, error) { return scanChannel(r) })
 }
+
+type Delivery struct {
+	ID            int64
+	TenantID      uuid.UUID
+	ChannelID     uuid.UUID
+	ChannelName   string
+	EventKind     string
+	Payload       []byte
+	State         string // pending|sent|failed
+	Attempts      int
+	NextAttemptAt time.Time
+	LastError     string
+	CreatedAt     time.Time
+	SentAt        *time.Time
+}
+
+const deliveryCols = `d.id, d.tenant_id, d.channel_id, coalesce(c.name, ''), d.event_kind, d.payload, d.state, d.attempts, d.next_attempt_at, d.last_error, d.created_at, d.sent_at`
+
+func scanDelivery(r pgx.Row) (Delivery, error) {
+	var d Delivery
+	return d, r.Scan(&d.ID, &d.TenantID, &d.ChannelID, &d.ChannelName, &d.EventKind, &d.Payload, &d.State, &d.Attempts, &d.NextAttemptAt, &d.LastError, &d.CreatedAt, &d.SentAt)
+}
+
+// EnqueueDeliveries inserts one pending delivery per channel. No-op for an
+// empty channel list.
+func (s *Store) EnqueueDeliveries(ctx context.Context, tenantID uuid.UUID, channelIDs []uuid.UUID, kind string, payload []byte, now time.Time) error {
+	if len(channelIDs) == 0 {
+		return nil
+	}
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO notification_deliveries (tenant_id, channel_id, event_kind, payload, state, next_attempt_at)
+		SELECT $1, unnest($2::uuid[]), $3, $4, 'pending', $5`,
+		tenantID, channelIDs, kind, payload, now)
+	return err
+}
+
+// ClaimDeliveries atomically takes up to limit due pending rows across all
+// tenants, bumping attempts and leasing them until now+lease so another
+// instance (or a retry after a crash) does not send them twice.
+func (s *Store) ClaimDeliveries(ctx context.Context, now time.Time, lease time.Duration, limit int) ([]Delivery, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	rows, err := tx.Query(ctx, `
+		WITH due AS (
+			SELECT id FROM notification_deliveries
+			WHERE state = 'pending' AND next_attempt_at <= $1
+			ORDER BY id LIMIT $3 FOR UPDATE SKIP LOCKED
+		)
+		UPDATE notification_deliveries d SET attempts = d.attempts + 1, next_attempt_at = $2
+		FROM due WHERE d.id = due.id
+		RETURNING d.id`, now, now.Add(lease), limit)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (int64, error) {
+		var id int64
+		return id, r.Scan(&id)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	rows, _ = s.pool.Query(ctx, `
+		SELECT `+deliveryCols+` FROM notification_deliveries d
+		LEFT JOIN notification_channels c ON c.id = d.channel_id
+		WHERE d.id = ANY($1) ORDER BY d.id`, ids)
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Delivery, error) { return scanDelivery(r) })
+}
+
+// FinishDelivery records the outcome of one attempt: state sent (sets
+// sent_at), pending (schedules nextAttempt) or failed (terminal).
+func (s *Store) FinishDelivery(ctx context.Context, id int64, state, lastError string, nextAttempt, now time.Time) error {
+	if len(lastError) > 500 {
+		lastError = lastError[:500]
+	}
+	var sentAt *time.Time
+	if state == "sent" {
+		sentAt = &now
+	}
+	if nextAttempt.IsZero() {
+		nextAttempt = now
+	}
+	return oneRow(s.pool.Exec(ctx, `
+		UPDATE notification_deliveries SET state=$2, last_error=$3, next_attempt_at=$4, sent_at=$5 WHERE id=$1`,
+		id, state, lastError, nextAttempt, sentAt))
+}
+
+func (s *Store) ListDeliveries(ctx context.Context, tenantID uuid.UUID, limit int) ([]Delivery, error) {
+	rows, _ := s.pool.Query(ctx, `
+		SELECT `+deliveryCols+` FROM notification_deliveries d
+		LEFT JOIN notification_channels c ON c.id = d.channel_id
+		WHERE d.tenant_id = $1 ORDER BY d.id DESC LIMIT $2`, tenantID, limit)
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Delivery, error) { return scanDelivery(r) })
+}

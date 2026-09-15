@@ -3,7 +3,9 @@ package store_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/store/storetest"
@@ -97,5 +99,121 @@ func TestChannelCRUDAndForEvent(t *testing.T) {
 	}
 	if _, err := s.GetChannel(ctx, tenant, c.ID); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("after delete err = %v", err)
+	}
+}
+
+func mkChannel(t *testing.T, s *store.Store, tenant uuid.UUID, name string) uuid.UUID {
+	t.Helper()
+	c := store.NotificationChannel{ID: uuid.New(), Kind: "webhook", Name: name, Events: []string{"alert.raised"}, Enabled: true, URL: "https://h.example/" + name}
+	if err := s.CreateChannel(context.Background(), tenant, c); err != nil {
+		t.Fatal(err)
+	}
+	return c.ID
+}
+
+func TestDeliveryOutbox(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	a := mkChannel(t, s, tenant, "a")
+	b := mkChannel(t, s, tenant, "b")
+	now := time.Now().Truncate(time.Second)
+
+	if err := s.EnqueueDeliveries(ctx, tenant, []uuid.UUID{a, b}, "alert.raised", []byte(`{"kind":"alert.raised"}`), now); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.EnqueueDeliveries(ctx, tenant, nil, "alert.raised", []byte(`{}`), now); err != nil {
+		t.Fatalf("empty channel list must be a no-op: %v", err)
+	}
+
+	// Not due yet.
+	if got, _ := s.ClaimDeliveries(ctx, now.Add(-time.Second), 2*time.Minute, 50); len(got) != 0 {
+		t.Fatalf("claimed before due: %+v", got)
+	}
+	got, err := s.ClaimDeliveries(ctx, now, 2*time.Minute, 50)
+	if err != nil || len(got) != 2 {
+		t.Fatalf("claim = %+v, %v", got, err)
+	}
+	if got[0].Attempts != 1 || got[0].TenantID != tenant || got[0].ChannelName == "" || !got[0].NextAttemptAt.Equal(now.Add(2*time.Minute)) || string(got[0].Payload) == "" {
+		t.Errorf("claimed row = %+v", got[0])
+	}
+	// Leased: a second claim now returns nothing.
+	if again, _ := s.ClaimDeliveries(ctx, now, 2*time.Minute, 50); len(again) != 0 {
+		t.Errorf("double claim = %+v", again)
+	}
+	// Lease expiry brings it back.
+	if again, _ := s.ClaimDeliveries(ctx, now.Add(3*time.Minute), 2*time.Minute, 1); len(again) != 1 || again[0].Attempts != 2 {
+		t.Errorf("after lease = %+v", again)
+	}
+
+	if err := s.FinishDelivery(ctx, got[0].ID, "sent", "", time.Time{}, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.FinishDelivery(ctx, got[1].ID, "pending", "500 boom", now.Add(time.Minute), now); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := s.ListDeliveries(ctx, tenant, 10)
+	if len(list) != 2 {
+		t.Fatalf("list = %+v", list)
+	}
+	states := map[int64]store.Delivery{}
+	for _, d := range list {
+		states[d.ID] = d
+	}
+	if d := states[got[0].ID]; d.State != "sent" || d.SentAt == nil {
+		t.Errorf("sent row = %+v", d)
+	}
+	if d := states[got[1].ID]; d.State != "pending" || d.LastError != "500 boom" || !d.NextAttemptAt.Equal(now.Add(time.Minute)) {
+		t.Errorf("retry row = %+v", d)
+	}
+	// Failed terminal.
+	s.FinishDelivery(ctx, got[1].ID, "failed", "gave up", time.Time{}, now)
+	if c, _ := s.ClaimDeliveries(ctx, now.Add(time.Hour), time.Minute, 50); len(c) != 0 {
+		t.Errorf("failed row claimed: %+v", c)
+	}
+	// Deleting the channel cascades.
+	s.DeleteChannel(ctx, tenant, a)
+	list, _ = s.ListDeliveries(ctx, tenant, 10)
+	if len(list) != 1 {
+		t.Errorf("after cascade = %+v", list)
+	}
+}
+
+func TestClaimDeliveriesConcurrent(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	ch := mkChannel(t, s, tenant, "a")
+	now := time.Now()
+	for i := 0; i < 20; i++ {
+		s.EnqueueDeliveries(ctx, tenant, []uuid.UUID{ch}, "alert.raised", []byte(`{}`), now)
+	}
+	var mu sync.Mutex
+	seen := map[int64]int{}
+	var wg sync.WaitGroup
+	for w := 0; w < 4; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			got, err := s.ClaimDeliveries(ctx, now, time.Minute, 10)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			mu.Lock()
+			for _, d := range got {
+				seen[d.ID]++
+			}
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	if len(seen) != 20 {
+		t.Fatalf("claimed %d distinct rows, want 20", len(seen))
+	}
+	for id, n := range seen {
+		if n != 1 {
+			t.Errorf("row %d claimed %d times", id, n)
+		}
 	}
 }
