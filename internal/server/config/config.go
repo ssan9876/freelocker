@@ -8,10 +8,24 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+// SMTP holds outbound email server settings for notifications.
+type SMTP struct {
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	From     string `yaml:"from"`
+	STARTTLS bool   `yaml:"starttls"`
+}
+
+// Configured reports whether outbound email can be sent at all.
+func (m SMTP) Configured() bool { return m.Host != "" && m.From != "" }
 
 type Config struct {
 	DatabaseURL          string   `yaml:"database_url"`
@@ -29,7 +43,11 @@ type Config struct {
 	ACMECacheDir         string   `yaml:"acme_cache_dir"`         // where issued certs are cached
 	MetricsRetentionDays int      `yaml:"metrics_retention_days"` // delete metrics/block-events/resolved-alerts older than this
 	ApprovalExpiryDays   int      `yaml:"approval_expiry_days"`   // pending approval requests idle this long become expired (0 disables)
+	SMTP                 SMTP     `yaml:"smtp"`
 }
+
+// SMTPConfigured reports whether outbound email can be sent at all.
+func (c Config) SMTPConfigured() bool { return c.SMTP.Configured() }
 
 // ConsoleTLSMode reports how the console listener obtains TLS:
 // "acme" (Let's Encrypt), "file" (cert+key), or "plain" (no TLS).
@@ -78,6 +96,7 @@ func Load(path string) (Config, error) {
 		ACMECacheDir:         "acme-cache",
 		MetricsRetentionDays: 30,
 		ApprovalExpiryDays:   30,
+		SMTP:                 SMTP{Port: 587, STARTTLS: true},
 	}
 	if path != "" {
 		b, err := os.ReadFile(path)
@@ -106,6 +125,18 @@ func Load(path string) (Config, error) {
 	}
 	if v := os.Getenv("FREELOCKER_PUBLIC_HOSTNAMES"); v != "" {
 		c.PublicHostnames = strings.Split(v, ",")
+	}
+	envStr(&c.SMTP.Host, "FREELOCKER_SMTP_HOST")
+	envStr(&c.SMTP.Username, "FREELOCKER_SMTP_USERNAME")
+	envStr(&c.SMTP.Password, "FREELOCKER_SMTP_PASSWORD")
+	envStr(&c.SMTP.From, "FREELOCKER_SMTP_FROM")
+	if v := os.Getenv("FREELOCKER_SMTP_PORT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			c.SMTP.Port = n
+		}
+	}
+	if v := os.Getenv("FREELOCKER_SMTP_STARTTLS"); v != "" {
+		c.SMTP.STARTTLS = v == "true"
 	}
 	if c.DatabaseURL == "" {
 		return c, errors.New("database_url is required")

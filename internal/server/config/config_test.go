@@ -62,3 +62,26 @@ func TestReleaseURLDefaultsAndOverride(t *testing.T) {
 		t.Errorf("unescaped version = %q", got)
 	}
 }
+
+func TestSMTPConfigAndEnv(t *testing.T) {
+	c := Config{}
+	if c.SMTPConfigured() {
+		t.Fatal("empty SMTP must not be configured")
+	}
+	c.SMTP = SMTP{Host: "mail.example.com", From: "a@example.com"}
+	if !c.SMTPConfigured() {
+		t.Fatal("host+from should be configured")
+	}
+	t.Setenv("FREELOCKER_SMTP_HOST", "env.example.com")
+	t.Setenv("FREELOCKER_SMTP_PORT", "465")
+	t.Setenv("FREELOCKER_SMTP_PASSWORD", "pw")
+	t.Setenv("FREELOCKER_SMTP_STARTTLS", "false")
+	t.Setenv("FREELOCKER_DATABASE_URL", "postgres://x")
+	got, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SMTP.Host != "env.example.com" || got.SMTP.Port != 465 || got.SMTP.Password != "pw" || got.SMTP.STARTTLS {
+		t.Errorf("smtp from env = %+v", got.SMTP)
+	}
+}
