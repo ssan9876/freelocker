@@ -53,6 +53,47 @@ type App struct {
 	agentSrv  *grpc.Server
 	agentAddr net.Addr
 	runCtx    context.Context
+
+	bgMu     sync.Mutex
+	bgCtx    context.Context
+	bgCancel context.CancelFunc
+	bg       sync.WaitGroup
+}
+
+// startBackground opens a task group whose context is cancelled, and whose
+// tasks are waited for, by Close. Re-opening a group stops the previous one.
+func (a *App) startBackground(parent context.Context) {
+	a.stopBackground()
+	a.bgMu.Lock()
+	defer a.bgMu.Unlock()
+	a.bgCtx, a.bgCancel = context.WithCancel(parent)
+}
+
+// background runs fn in the current task group. Close will not return until
+// fn does, so a task may use the store for its whole lifetime.
+func (a *App) background(fn func(context.Context)) {
+	a.bgMu.Lock()
+	ctx := a.bgCtx
+	a.bgMu.Unlock()
+	if ctx == nil {
+		return
+	}
+	a.bg.Add(1)
+	go func() {
+		defer a.bg.Done()
+		fn(ctx)
+	}()
+}
+
+func (a *App) stopBackground() {
+	a.bgMu.Lock()
+	cancel := a.bgCancel
+	a.bgCtx, a.bgCancel = nil, nil
+	a.bgMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	a.bg.Wait()
 }
 
 func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error) {
@@ -298,7 +339,8 @@ func (a *App) activate(k *bootstrap.Keys) error {
 	if runCtx == nil {
 		runCtx = context.Background()
 	}
-	go notifier.Run(runCtx)
+	a.startBackground(runCtx)
+	a.background(notifier.Run)
 	a.mu.Lock()
 	a.rt = &httpapi.Runtime{Keys: k, Commands: cmds, Policy: policy, Rollouts: rollouts, Notify: notifier}
 	a.agentSrv, a.agentAddr = srv, lis.Addr()
@@ -373,14 +415,9 @@ func (a *App) Run(ctx context.Context) error {
 				if err := rt.Rollouts.Tick(ctx); err != nil {
 					a.log.Error("rollout tick", "err", err)
 				}
-				// Lost-wake safety net only; run it off the housekeeping
-				// path so a slow receiver cannot delay the next tick. The
-				// claim lease makes a concurrent dispatch safe.
-				go func() {
-					if _, _, err := rt.Notify.Dispatch(ctx); err != nil {
-						a.log.Error("notify dispatch", "err", err)
-					}
-				}()
+				// No notify dispatch here: the dispatcher's own loop already
+				// drains every 30s regardless of wakes, and a goroutine
+				// detached from this tick would outlive Close.
 			}
 			// Housekeeping: drop login failures older than the rate-limit window.
 			if _, err := a.store.PruneLoginFailures(ctx, time.Now().Add(-15*time.Minute)); err != nil {
@@ -416,6 +453,8 @@ func (a *App) Close() {
 	if srv != nil {
 		srv.Stop()
 	}
+	// Background tasks run off the store, so they must finish before it closes.
+	a.stopBackground()
 	if a.ownsStore {
 		a.store.Close()
 	}

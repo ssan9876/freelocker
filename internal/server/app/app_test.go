@@ -109,3 +109,27 @@ func TestHealthRoutesThroughMux(t *testing.T) {
 		}
 	}
 }
+
+// Close must not return while a background task is still running: the
+// notify dispatcher runs off the store, and closing the pool under it
+// logs a "closed pool" error (and could cut a delivery mid-send).
+func TestCloseWaitsForBackgroundTasks(t *testing.T) {
+	a := &App{}
+	a.startBackground(context.Background())
+
+	started, stopped := make(chan struct{}), make(chan struct{})
+	a.background(func(ctx context.Context) {
+		close(started)
+		<-ctx.Done()
+		time.Sleep(20 * time.Millisecond) // still winding down when Close returns
+		close(stopped)
+	})
+	<-started
+
+	a.Close()
+	select {
+	case <-stopped:
+	default:
+		t.Fatal("Close returned while a background task was still running")
+	}
+}
