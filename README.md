@@ -16,7 +16,7 @@ Server (freelocker-server, one binary)
 Agent (freelocker-agent, Windows service, SYSTEM)
   enroll · heartbeat/inventory · signed commands · cert auto-renew
   WDAC application control · learning · block reporting
-  resource metrics · USB storage control · self-update · self-protection
+  resource metrics · USB storage control · self-update (staged rollouts with pause/rollback) · self-protection
 Console (React SPA, embedded in the server)
   setup · login + TOTP · devices · policies · blocked programs · alerts
   install tokens · groups + controls · admins · agent releases · audit log
