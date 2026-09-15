@@ -77,7 +77,8 @@ func (s *Service) Reconcile(ctx context.Context, tenantID uuid.UUID, r store.Rol
 	now := s.now()
 
 	// 1. Resolve in-flight devices first so freed batch slots are reused.
-	if _, _, err := s.Store.ResolveRolloutDevices(ctx, tenantID, r.ID, now, s.timeout()); err != nil {
+	_, newlyFailed, err := s.Store.ResolveRolloutDevices(ctx, tenantID, r.ID, now, s.timeout())
+	if err != nil {
 		return fmt.Errorf("resolve: %w", err)
 	}
 	sum, err := s.Store.RolloutSummary(ctx, tenantID, r.ID)
@@ -85,15 +86,20 @@ func (s *Service) Reconcile(ctx context.Context, tenantID uuid.UUID, r store.Rol
 		return err
 	}
 
-	// 2. Auto-pause when failures reach the threshold.
-	if r.MaxFailures > 0 && sum.Failed >= r.MaxFailures {
+	// 2. Auto-pause when failures reach the threshold. Only a tick that
+	// resolved a new failure may pause: the failure count is cumulative, so
+	// gating on it alone would re-pause the rollout on the first tick after
+	// an operator resumed it, leaving resume a dead end.
+	if r.MaxFailures > 0 && newlyFailed > 0 && sum.Failed >= r.MaxFailures {
 		if err := s.Store.SetRolloutState(ctx, tenantID, r.ID, []string{"active"}, "paused", now); err != nil {
 			return fmt.Errorf("auto-pause: %w", err)
 		}
-		s.Store.AppendAudit(ctx, tenantID, store.AuditEntry{
+		if err := s.Store.AppendAudit(ctx, tenantID, store.AuditEntry{
 			Actor: "system", Action: "rollout.auto_pause", TargetType: "rollout", TargetID: r.ID.String(),
 			Detail: map[string]any{"version": r.Version, "failed": sum.Failed, "max_failures": r.MaxFailures}, Result: "success",
-		})
+		}); err != nil {
+			s.log().Error("rollout audit", "rollout", r.ID, "action", "rollout.auto_pause", "err", err)
+		}
 		s.log().Warn("rollout auto-paused", "rollout", r.ID, "failed", sum.Failed)
 		return nil
 	}

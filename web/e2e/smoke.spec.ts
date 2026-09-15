@@ -111,7 +111,7 @@ test("first-run setup, sign in with MFA, manage groups, rules and admins", async
   await page.getByRole("button", { name: "Start", exact: true }).click();
   const card = page.getByTestId("rollout-card");
   await expect(card).toBeVisible();
-  await expect(card.getByLabel("Rollout state")).toHaveText(/active|completed/);
+  await expect(card.getByLabel("Rollout state")).toHaveText("active");
   await card.getByRole("button", { name: "Cancel rollout" }).click();
   await expect(page.getByText("No rollout in progress.")).toBeVisible();
 });

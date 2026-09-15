@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 
@@ -64,7 +65,7 @@ func (c Config) ReleaseURL(version string) string {
 		}
 		base = scheme + "://" + host + ":" + port
 	}
-	return base + "/agent/releases/" + version
+	return base + "/agent/releases/" + url.PathEscape(version)
 }
 
 func Load(path string) (Config, error) {

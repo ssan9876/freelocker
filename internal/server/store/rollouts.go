@@ -191,7 +191,7 @@ type RolloutSummary struct {
 	Issued         int
 	Updated        int
 	Failed         int
-	Remaining      int // targeted − already_current − issued − updated − failed
+	Remaining      int // targeted, not yet on the version, and without a progress row
 }
 
 // RolloutCandidates lists targeted, non-revoked devices not yet on the
@@ -296,17 +296,15 @@ func (s *Store) RolloutSummary(ctx context.Context, tenantID, id uuid.UUID) (Rol
 			(SELECT count(*) FROM rows WHERE state = 'issued'),
 			(SELECT count(*) FROM rows WHERE state = 'updated'),
 			(SELECT count(*) FROM rows WHERE state = 'failed'),
+			(SELECT count(*) FROM targeted t, r WHERE t.agent_version <> r.version
+				AND NOT EXISTS (SELECT 1 FROM agent_rollout_devices rd WHERE rd.rollout_id = r.id AND rd.device_id = t.id)),
 			(SELECT count(*) FROM r)`, tenantID, id).
-		Scan(&sum.Targeted, &sum.AlreadyCurrent, &sum.Issued, &sum.Updated, &sum.Failed, &exists)
+		Scan(&sum.Targeted, &sum.AlreadyCurrent, &sum.Issued, &sum.Updated, &sum.Failed, &sum.Remaining, &exists)
 	if err != nil {
 		return sum, err
 	}
 	if exists == 0 { // the rollout is not in this tenant
 		return sum, ErrNotFound
-	}
-	sum.Remaining = sum.Targeted - sum.AlreadyCurrent - sum.Issued - sum.Updated - sum.Failed
-	if sum.Remaining < 0 {
-		sum.Remaining = 0
 	}
 	return sum, nil
 }

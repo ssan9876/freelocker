@@ -57,4 +57,8 @@ func TestReleaseURLDefaultsAndOverride(t *testing.T) {
 	if got := c.ReleaseURL("v"); got != "http://localhost:443/agent/releases/v" {
 		t.Errorf("no hostnames = %q", got)
 	}
+	// The version is a path segment: it must be escaped, not pasted raw.
+	if got := c.ReleaseURL("1.0 beta"); got != "http://localhost:443/agent/releases/1.0%20beta" {
+		t.Errorf("unescaped version = %q", got)
+	}
 }

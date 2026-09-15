@@ -236,3 +236,76 @@ func TestOfflineDevicesKeepRolloutActive(t *testing.T) {
 		t.Fatalf("state = %s, want active while an offline device remains", got.State)
 	}
 }
+
+// A device revoked mid-rollout keeps its progress row, but must not make the
+// reconciler believe every targeted device is done.
+func TestRevokedDeviceDoesNotCompleteRollout(t *testing.T) {
+	f := newFixture(t)
+	a := f.device(t, "a", "1.0.0", true)
+	f.device(t, "b-offline", "1.0.0", false)
+	r := f.rollout(t, 10, 0)
+	ctx := context.Background()
+
+	f.tick(t)
+	row := f.commandFor(t, r.ID, a)
+	f.s.CompleteCommand(ctx, f.tenant, a, row.CommandID, true, "ok", f.now)
+	f.s.RecordHeartbeat(ctx, f.tenant, a, store.Inventory{AgentVersion: "2.0.0"}, f.now)
+	if err := f.s.RevokeDevice(ctx, f.tenant, a); err != nil {
+		t.Fatal(err)
+	}
+
+	f.now = f.now.Add(time.Minute)
+	f.tick(t)
+	got, _ := f.s.GetRollout(ctx, f.tenant, r.ID)
+	sum := f.summary(t, r.ID)
+	if got.State != "active" || sum.Remaining != 1 {
+		t.Fatalf("state = %s, summary = %+v (want active, b still remaining)", got.State, sum)
+	}
+}
+
+// After an operator resumes an auto-paused rollout the next tick must carry
+// on rather than immediately re-pause on the same cumulative failure count.
+func TestResumeAfterAutoPauseContinues(t *testing.T) {
+	f := newFixture(t)
+	a := f.device(t, "a", "1.0.0", true)
+	b := f.device(t, "b", "1.0.0", true)
+	c := f.device(t, "c", "1.0.0", true)
+	r := f.rollout(t, 2, 2)
+	ctx := context.Background()
+
+	f.tick(t)
+	for _, d := range []uuid.UUID{a, b} {
+		row := f.commandFor(t, r.ID, d)
+		f.s.CompleteCommand(ctx, f.tenant, d, row.CommandID, false, "hash mismatch", f.now)
+	}
+	f.tick(t)
+	if got, _ := f.s.GetRollout(ctx, f.tenant, r.ID); got.State != "paused" {
+		t.Fatalf("state = %s, want paused", got.State)
+	}
+
+	// Operator resumes; the next tick must keep going and issue to c.
+	f.now = f.now.Add(time.Minute)
+	if err := f.s.SetRolloutState(ctx, f.tenant, r.ID, []string{"paused"}, "active", f.now); err != nil {
+		t.Fatal(err)
+	}
+	f.tick(t)
+	got, _ := f.s.GetRollout(ctx, f.tenant, r.ID)
+	sum := f.summary(t, r.ID)
+	if got.State != "active" || sum.Issued != 1 || sum.Remaining != 0 {
+		t.Fatalf("after resume: state = %s, summary = %+v (want active with c issued)", got.State, sum)
+	}
+	if f.commandFor(t, r.ID, c).State != "issued" {
+		t.Error("c should have been issued to after the resume")
+	}
+	// Resuming must not write a second auto-pause audit row.
+	entries, _ := f.s.ListAudit(ctx, f.tenant, 50, 0)
+	n := 0
+	for _, e := range entries {
+		if e.Action == "rollout.auto_pause" && e.TargetID == r.ID.String() {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("rollout.auto_pause audit rows = %d, want 1", n)
+	}
+}

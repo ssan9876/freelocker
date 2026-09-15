@@ -335,3 +335,43 @@ func TestRolloutSummaryCountsCurrentAndRemaining(t *testing.T) {
 		t.Errorf("expired command should fail the device; failed = %d", fail)
 	}
 }
+
+// Remaining must be a real count of untouched targeted devices, not a
+// subtraction: progress rows survive a device being revoked or moved out of
+// the targeted set, so subtracting them can reach 0 while a device that was
+// never issued to is still on the old version.
+func TestRolloutSummaryRemainingIsACount(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	a := enrollTestDevice(t, s, tenant, nil, "a", "1.0.0")
+	enrollTestDevice(t, s, tenant, nil, "b", "1.0.0") // never issued to
+	r := newTestRollout(t, s, tenant, nil)
+
+	// a is issued to, updates, then is revoked mid-rollout.
+	now := time.Now()
+	cmd := uuid.New()
+	if err := s.CreateCommand(ctx, tenant, store.Command{ID: cmd, DeviceID: a, Type: "update_agent", IssuedAt: now, ExpiresAt: now.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddRolloutDevice(ctx, r.ID, a, cmd, now); err != nil {
+		t.Fatal(err)
+	}
+	s.CompleteCommand(ctx, tenant, a, cmd, true, "ok", now)
+	s.RecordHeartbeat(ctx, tenant, a, store.Inventory{Hostname: "a", AgentVersion: "2.0.0"}, now)
+	if up, _, err := s.ResolveRolloutDevices(ctx, tenant, r.ID, now, 10*time.Minute); err != nil || up != 1 {
+		t.Fatalf("resolve = %d, %v", up, err)
+	}
+	if err := s.RevokeDevice(ctx, tenant, a); err != nil {
+		t.Fatal(err)
+	}
+
+	sum, err := s.RolloutSummary(ctx, tenant, r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Targeted drops to 1 (b) while Updated still counts revoked a.
+	if sum.Targeted != 1 || sum.Updated != 1 || sum.Remaining != 1 {
+		t.Fatalf("summary = %+v, want Remaining 1 (b is untouched and still on 1.0.0)", sum)
+	}
+}
