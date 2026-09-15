@@ -27,7 +27,10 @@ export function Notifications() {
 
   const load = useCallback(() => {
     api.get<NotificationStatus>("/api/notifications/status").then(setStatus).catch(() => {});
-    api.get<NotificationChannel[]>("/api/notification-channels").then(setChannels).catch(() => setChannels([]));
+    api
+      .get<NotificationChannel[]>("/api/notification-channels")
+      .then(setChannels)
+      .catch(() => setChannels((cur) => cur ?? []));
     api.get<NotificationDelivery[]>("/api/notification-deliveries?limit=50").then(setDeliveries).catch(() => {});
   }, []);
   useEffect(() => {
@@ -64,13 +67,14 @@ export function Notifications() {
   };
 
   const setEnabled = async (c: NotificationChannel, enabled: boolean) => {
+    const previous = c.enabled;
     setChannels((cur) => cur?.map((x) => (x.id === c.id ? { ...x, enabled } : x)) ?? cur);
     try {
       await api.patch(`/api/notification-channels/${c.id}`, { enabled });
       load();
     } catch (e) {
+      setChannels((cur) => cur?.map((x) => (x.id === c.id ? { ...x, enabled: previous } : x)) ?? cur);
       notify(e instanceof ApiError ? e.message : "Could not update channel", "error");
-      load();
     }
   };
 
