@@ -22,9 +22,11 @@ type Service struct {
 
 func New(s *store.Store) *Service { return &Service{Store: s} }
 
-func (s *Service) emit(ctx context.Context, e notify.Event) {
+// emit builds and sends an event only when a notifier is configured: build
+// is a closure so an unconfigured deployment pays no store round trip.
+func (s *Service) emit(ctx context.Context, build func() notify.Event) {
 	if s.Notify != nil {
-		s.Notify.Emit(ctx, e)
+		s.Notify.Emit(ctx, build())
 	}
 }
 
@@ -76,7 +78,9 @@ func (s *Service) Evaluate(ctx context.Context, tenantID, deviceID uuid.UUID, sa
 					return err
 				}
 				if created {
-					s.emit(ctx, s.alertEvent(ctx, "alert.raised", tenantID, deviceID, r, msg, now))
+					s.emit(ctx, func() notify.Event {
+						return s.alertEvent(ctx, "alert.raised", tenantID, deviceID, r, msg, now)
+					})
 				}
 			}
 		} else {
@@ -88,7 +92,9 @@ func (s *Service) Evaluate(ctx context.Context, tenantID, deviceID uuid.UUID, sa
 				return err
 			}
 			if closed {
-				s.emit(ctx, s.alertEvent(ctx, "alert.resolved", tenantID, deviceID, r, "", now))
+				s.emit(ctx, func() notify.Event {
+					return s.alertEvent(ctx, "alert.resolved", tenantID, deviceID, r, "", now)
+				})
 			}
 		}
 	}

@@ -3,9 +3,11 @@ package store_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/store/storetest"
@@ -176,6 +178,47 @@ func TestDeliveryOutbox(t *testing.T) {
 	list, _ = s.ListDeliveries(ctx, tenant, 10)
 	if len(list) != 1 {
 		t.Errorf("after cascade = %+v", list)
+	}
+}
+
+// A last_error longer than the 500-byte cap must not be cut mid-rune:
+// Postgres rejects an invalid UTF-8 parameter, which would leave the row
+// stuck in pending and re-claimed forever.
+func TestFinishDeliveryTruncatesInvalidUTF8(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	ch := mkChannel(t, s, tenant, "a")
+	now := time.Now().Truncate(time.Second)
+	if err := s.EnqueueDeliveries(ctx, tenant, []uuid.UUID{ch}, "alert.raised", []byte(`{}`), now); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.ClaimDeliveries(ctx, now, time.Minute, 1)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("claim = %+v, %v", got, err)
+	}
+	// Byte 499 is the first byte of the two-byte "é", so a plain [:500]
+	// slice splits it.
+	msg := strings.Repeat("a", 499) + "é…"
+	if len(msg) <= 500 || utf8.ValidString(msg[:500]) {
+		t.Fatalf("test fixture does not split a rune at byte 500 (len %d)", len(msg))
+	}
+	if err := s.FinishDelivery(ctx, got[0].ID, "pending", msg, now.Add(time.Minute), now); err != nil {
+		t.Fatalf("FinishDelivery with mid-rune truncation: %v", err)
+	}
+	list, err := s.ListDeliveries(ctx, tenant, 10)
+	if err != nil || len(list) != 1 {
+		t.Fatalf("list = %+v, %v", list, err)
+	}
+	stored := list[0].LastError
+	if len(stored) > 500 {
+		t.Errorf("stored last_error is %d bytes, want <= 500", len(stored))
+	}
+	if !utf8.ValidString(stored) {
+		t.Errorf("stored last_error is not valid UTF-8: %q", stored)
+	}
+	if !strings.HasPrefix(stored, strings.Repeat("a", 100)) {
+		t.Errorf("stored last_error lost its prefix: %q", stored)
 	}
 }
 

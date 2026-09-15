@@ -230,8 +230,11 @@ func (s *Store) ClaimDeliveries(ctx context.Context, now time.Time, lease time.D
 // FinishDelivery records the outcome of one attempt: state sent (sets
 // sent_at), pending (schedules nextAttempt) or failed (terminal).
 func (s *Store) FinishDelivery(ctx context.Context, id int64, state, lastError string, nextAttempt, now time.Time) error {
+	// Truncate to 500 bytes, then drop any invalid bytes: cutting on a byte
+	// boundary can split a multi-byte rune, and Postgres rejects an invalid
+	// UTF-8 parameter, which would leave the delivery wedged in pending.
 	if len(lastError) > 500 {
-		lastError = lastError[:500]
+		lastError = strings.ToValidUTF8(lastError[:500], "")
 	}
 	var sentAt *time.Time
 	if state == "sent" {

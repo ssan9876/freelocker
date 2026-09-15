@@ -373,9 +373,14 @@ func (a *App) Run(ctx context.Context) error {
 				if err := rt.Rollouts.Tick(ctx); err != nil {
 					a.log.Error("rollout tick", "err", err)
 				}
-				if _, _, err := rt.Notify.Dispatch(ctx); err != nil {
-					a.log.Error("notify dispatch", "err", err)
-				}
+				// Lost-wake safety net only; run it off the housekeeping
+				// path so a slow receiver cannot delay the next tick. The
+				// claim lease makes a concurrent dispatch safe.
+				go func() {
+					if _, _, err := rt.Notify.Dispatch(ctx); err != nil {
+						a.log.Error("notify dispatch", "err", err)
+					}
+				}()
 			}
 			// Housekeeping: drop login failures older than the rate-limit window.
 			if _, err := a.store.PruneLoginFailures(ctx, time.Now().Add(-15*time.Minute)); err != nil {

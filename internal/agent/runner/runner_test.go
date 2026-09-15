@@ -49,7 +49,8 @@ func eventually(t *testing.T, what string, cond func() bool) {
 }
 
 func TestRunnerEnrollsOnlineCommandAndRevoke(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	cfg := config.Config{AgentListen: "127.0.0.1:0", PublicHostnames: []string{"127.0.0.1"}, InsecureCookies: true}
 	a, err := app.NewWithStore(cfg, storetest.New(t), bytes.Repeat([]byte{7}, 32), slog.Default())
 	if err != nil {

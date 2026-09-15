@@ -20,19 +20,21 @@ import (
 
 func startServer(t *testing.T) (addr, token string) {
 	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	cfg := config.Config{AgentListen: "127.0.0.1:0", PublicHostnames: []string{"127.0.0.1"}, InsecureCookies: true}
 	a, err := app.NewWithStore(cfg, storetest.New(t), bytes.Repeat([]byte{6}, 32), slog.Default())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(a.Close)
-	if _, err := a.Initialize(context.Background(), "Acme", "o@example.com", "owner-password-123"); err != nil {
+	if _, err := a.Initialize(ctx, "Acme", "o@example.com", "owner-password-123"); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.ActivateForTests(context.Background()); err != nil {
+	if err := a.ActivateForTests(ctx); err != nil {
 		t.Fatal(err)
 	}
-	tok, err := a.TokenForTests(context.Background())
+	tok, err := a.TokenForTests(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

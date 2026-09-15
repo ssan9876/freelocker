@@ -39,8 +39,12 @@ type Nop struct{}
 func (Nop) Emit(context.Context, Event) {}
 
 const (
-	ClaimLease  = 2 * time.Minute
-	ClaimBatch  = 50
+	// Invariant: ClaimLease must exceed ClaimBatch x the slowest per-send
+	// timeout (webhooks 10s, SMTP up to a 30s connection deadline), because a
+	// claimed batch is sent serially. If the lease expired mid-batch another
+	// instance would re-claim rows still in flight and send them twice.
+	ClaimLease  = 10 * time.Minute
+	ClaimBatch  = 10
 	MaxAttempts = 5
 	errNoSMTP   = "smtp is not configured on this server"
 	testKind    = "notify.test"

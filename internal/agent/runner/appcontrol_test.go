@@ -46,7 +46,8 @@ func (e *recordingEnforcer) Events(context.Context) ([]blocks.BlockEvent, error)
 func (e *recordingEnforcer) Status() enforcer.Status { return e.status }
 
 func TestAppControlSyncObserveAndBlocks(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 	cfg := config.Config{AgentListen: "127.0.0.1:0", PublicHostnames: []string{"127.0.0.1"}, InsecureCookies: true}
 	a, err := app.NewWithStore(cfg, storetest.New(t), bytes.Repeat([]byte{9}, 32), slog.Default())
 	if err != nil {

@@ -106,6 +106,7 @@ func (s *agentService) queueApprovals(ctx context.Context, tenantID, deviceID uu
 	for _, id := range newIDs {
 		req, err := s.d.Store.GetApprovalRequest(ctx, tenantID, id)
 		if err != nil {
+			s.d.Log.Error("load approval request for notification", "request", id, "err", err)
 			continue
 		}
 		s.d.Notify.Emit(ctx, notify.Event{Kind: "approval.new", TenantID: tenantID, At: req.FirstSeen,
