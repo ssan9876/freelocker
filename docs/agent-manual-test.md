@@ -24,7 +24,7 @@ the device's uninstall code from the console.
 2. With the VM agent online and on 0.2.1, click **Start rollout** on 0.2.2, batch 1, pause after 1 failure.
 3. Within a minute the card shows 1 in flight; the agent downloads, stages, and the swap helper restarts the service. On the next heartbeat the device reports 0.2.2 and the card shows 1 updated → state completed.
 4. Roll back: pick 0.2.1 in **Roll back to** and click **Roll back**. The old rollout shows as cancelled in history and a new one runs to 0.2.1.
-5. Failure path: upload a build whose file you then delete from `release_dir`. Start a rollout; the agent's download 404s, the device shows failed with the agent's message, and the rollout auto-pauses.
+5. Failure path: upload a build whose file you then delete from `<release_dir>/<tenant_id>/` (release binaries are stored one directory per tenant). Start a rollout; the agent's download 404s, the device shows failed with the agent's message, and the rollout auto-pauses.
 
 ## Notifications
 
