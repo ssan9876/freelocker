@@ -49,7 +49,11 @@ or publisher rule); **richer device controls** (network and elevation, not just
 USB); **telemetry event streams** (process launches and logons on an
 Activity page); **health/readiness probes** and **Let's Encrypt** console
 TLS; **multi-instance safety** (the login rate-limiter and alert breach
-state live in Postgres) and **time-series retention**; a **GitHub Actions
+state live in Postgres) and **time-series retention**; **email + webhook
+notifications** (a retrying outbox fans alert, approval and rollout events
+out to per-tenant channels, with HMAC-signed webhook posts and a Test send
+from the console) — see
+`docs/superpowers/specs/2026-09-14-notifications-design.md`; a **GitHub Actions
 CI** pipeline (Go tests + Postgres, Windows cross-compile, console build,
 Playwright E2E). **MSP multi-tenancy** is built end to end — per-tenant keys
 and CAs, SNI-selected per-tenant transport, global-email login, a

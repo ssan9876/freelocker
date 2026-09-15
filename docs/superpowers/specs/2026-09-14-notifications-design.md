@@ -223,6 +223,22 @@ Audit: `notification_channel.create|update|delete|test` (target type
   for `net/http` never includes request headers.
 - Suspended tenants: `ChannelsForEvent` joins `tenants` and returns nothing
   for suspended ones, so nothing is enqueued.
+- `last_error` is truncated to 500 bytes on a rune boundary and forced to
+  valid UTF-8: a cut mid-rune would be rejected by Postgres, wedging the
+  delivery in `pending` to be re-claimed forever.
+
+### Security notes
+
+Blind SSRF is an accepted exposure. A webhook channel's URL is supplied by a
+tenant admin and fetched by the server with no host allowlist (only the
+scheme is validated), and the outcome — HTTP status or connection error —
+reaches that admin through the Test result and the delivery's `last_error`.
+A tenant admin can therefore use the server to probe hosts reachable from it,
+including private addresses. This is accepted rather than fixed: creating
+channels is already an admin-only, audited capability, and an allowlist would
+break the self-hosted deployments that legitimately point webhooks at
+internal receivers. Operators who care should restrict the server's outbound
+egress at the network layer.
 
 ## Testing
 

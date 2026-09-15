@@ -28,6 +28,6 @@ the device's uninstall code from the console.
 
 ## Notifications
 
-1. **Webhook channel:** On the Notifications page, create a webhook channel pointed at a request-bin style URL (e.g., https://webhook.site/<unique-id>). Press **Test send** and confirm the webhook receives a POST with headers `X-FreeLocker-Event`, `X-FreeLocker-Delivery`, and `X-FreeLocker-Signature: sha256=<hex HMAC-SHA256>` (when a signing secret is set).
+1. **Webhook channel:** On the Notifications page, create a webhook channel pointed at a request-bin style URL (e.g., https://webhook.site/<unique-id>). Press **Test** and confirm the webhook receives a POST with headers `X-FreeLocker-Event`, `X-FreeLocker-Delivery`, and `X-FreeLocker-Signature: sha256=<hex HMAC-SHA256>` (when a signing secret is set).
 2. **Alert rule:** Create an alert rule with a CPU % threshold of 1 so a real agent running on the VM immediately trips it. Confirm the signed POST arrives on the webhook with event kind `alert.raised`.
 3. **Rollout auto-pause:** Run the staged rollout failure drill (step 5 above). When the rollout auto-pauses due to the download failure, confirm that email and/or webhook notifications fire with event kind `rollout.auto_paused`.
