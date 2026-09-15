@@ -137,10 +137,10 @@ logged, never returned to the producer.
 `app.activate`; the minute ticker also calls `Dispatch` as a belt-and-braces
 path so a wake lost across instances still drains.
 
-**Dispatch**: `store.ClaimDeliveries(ctx, now, limit 50)` runs
+**Dispatch**: `store.ClaimDeliveries(ctx, now, lease, limit)` (batch 10) runs
 `SELECT … WHERE state='pending' AND next_attempt_at <= now ORDER BY id FOR
 UPDATE SKIP LOCKED` in a transaction and bumps `attempts` + sets
-`next_attempt_at = now + 2 min` (a lease, so a crashed instance's rows come
+`next_attempt_at = now + 10 min` (a lease, so a crashed instance's rows come
 back). For each claimed row: load the channel, send, then
 `store.FinishDelivery(id, ok, errMsg, nextAttempt)`. Backoff by attempt:
 1 min, 5 min, 30 min; after attempt 5 the row becomes `failed`. Channel
