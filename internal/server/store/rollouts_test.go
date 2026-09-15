@@ -425,3 +425,48 @@ func TestRevokedDeviceLeavesRollout(t *testing.T) {
 		t.Errorf("rollout devices = %+v, want one cancelled row", devs)
 	}
 }
+
+// The rollouts list needs a summary per rollout; one round trip each is an
+// N+1, so RolloutSummaries answers for a whole page at once.
+func TestRolloutSummaries(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	ws, _ := s.CreateDeviceGroup(ctx, tenant, "WS")
+	enrollTestDevice(t, s, tenant, &ws, "in-group", "1.0.0")
+	enrollTestDevice(t, s, tenant, nil, "ungrouped", "2.0.0")
+
+	// One finished rollout scoped to a group, one open rollout over everything.
+	scoped := newTestRollout(t, s, tenant, []uuid.UUID{ws})
+	if err := s.SetRolloutState(ctx, tenant, scoped.ID, []string{"active"}, "cancelled", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	all := newTestRollout(t, s, tenant, nil)
+
+	got, err := s.RolloutSummaries(ctx, tenant, []uuid.UUID{scoped.ID, all.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("summaries = %d, want 2", len(got))
+	}
+	if g := got[scoped.ID]; g.Targeted != 1 || g.Remaining != 1 || g.AlreadyCurrent != 0 {
+		t.Errorf("scoped = %+v, want only the in-group device", g)
+	}
+	if g := got[all.ID]; g.Targeted != 2 || g.Remaining != 1 || g.AlreadyCurrent != 1 {
+		t.Errorf("all = %+v, want both devices, one already current", g)
+	}
+
+	// Same numbers as the single-rollout query, and unknown ids are absent.
+	one, err := s.RolloutSummary(ctx, tenant, all.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if one != got[all.ID] {
+		t.Errorf("RolloutSummary = %+v, RolloutSummaries = %+v", one, got[all.ID])
+	}
+	other, err := s.RolloutSummaries(ctx, tenant, []uuid.UUID{uuid.New()})
+	if err != nil || len(other) != 0 {
+		t.Errorf("unknown id = %v, %v; want an empty map", other, err)
+	}
+}

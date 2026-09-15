@@ -126,14 +126,18 @@ func (a *API) listRollouts(w http.ResponseWriter, r *http.Request) {
 		a.storeErr(w, err)
 		return
 	}
+	ids := make([]uuid.UUID, len(list))
+	for i, ro := range list {
+		ids[i] = ro.ID
+	}
+	sums, err := a.Store.RolloutSummaries(r.Context(), p.TenantID, ids)
+	if err != nil {
+		a.storeErr(w, err)
+		return
+	}
 	out := make([]rolloutJSON, 0, len(list))
 	for _, ro := range list {
-		sum, err := a.Store.RolloutSummary(r.Context(), p.TenantID, ro.ID)
-		if err != nil {
-			a.storeErr(w, err)
-			return
-		}
-		out = append(out, toRolloutJSON(ro, sum))
+		out = append(out, toRolloutJSON(ro, sums[ro.ID]))
 	}
 	writeJSON(w, http.StatusOK, out)
 }

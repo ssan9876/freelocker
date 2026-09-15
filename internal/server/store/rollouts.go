@@ -174,7 +174,7 @@ type RolloutDevice struct {
 	DeviceID   uuid.UUID
 	Hostname   string
 	CommandID  uuid.UUID
-	State      string // issued|updated|failed
+	State      string // issued|updated|failed|cancelled
 	Detail     string
 	IssuedAt   time.Time
 	ResolvedAt *time.Time
@@ -286,37 +286,62 @@ func (s *Store) ResolveRolloutDevices(ctx context.Context, tenantID, id uuid.UUI
 	return updated, failed, rows.Err()
 }
 
-func (s *Store) RolloutSummary(ctx context.Context, tenantID, id uuid.UUID) (RolloutSummary, error) {
-	var sum RolloutSummary
-	var exists int
-	err := s.pool.QueryRow(ctx, `
-		WITH r AS (SELECT id, version, group_ids FROM agent_rollouts WHERE tenant_id = $1 AND id = $2),
+// RolloutSummaries counts progress for several rollouts in one round trip:
+// the rollouts list needs a summary per row, and one query each is an N+1.
+// Rollouts not in the tenant are simply absent from the map.
+func (s *Store) RolloutSummaries(ctx context.Context, tenantID uuid.UUID, ids []uuid.UUID) (map[uuid.UUID]RolloutSummary, error) {
+	rows, _ := s.pool.Query(ctx, `
+		WITH r AS (SELECT id, version, group_ids FROM agent_rollouts WHERE tenant_id = $1 AND id = ANY($2)),
 		targeted AS (
-			SELECT d.id, d.agent_version FROM devices d, r
-			WHERE d.tenant_id = $1 AND NOT d.revoked AND (cardinality(r.group_ids) = 0 OR d.group_id = ANY(r.group_ids))
+			SELECT r.id AS rollout_id, d.id AS device_id, (d.agent_version = r.version) AS current
+			FROM r JOIN devices d ON d.tenant_id = $1 AND NOT d.revoked
+				AND (cardinality(r.group_ids) = 0 OR d.group_id = ANY(r.group_ids))
 		),
 		-- Progress rows for revoked devices are excluded exactly as they are
 		-- from targeted, so the state counts always add up against it.
-		rows AS (
-			SELECT rd.state FROM agent_rollout_devices rd
+		progress AS (
+			SELECT rd.rollout_id, rd.state FROM agent_rollout_devices rd
 			JOIN r ON r.id = rd.rollout_id
 			JOIN devices d ON d.id = rd.device_id AND NOT d.revoked
+		),
+		-- Targeted devices the rollout has not acted on: already on the
+		-- version (already_current) or still to do (remaining).
+		untouched AS (
+			SELECT t.rollout_id, t.current FROM targeted t
+			WHERE NOT EXISTS (
+				SELECT 1 FROM agent_rollout_devices rd
+				WHERE rd.rollout_id = t.rollout_id AND rd.device_id = t.device_id)
 		)
-		SELECT
-			(SELECT count(*) FROM targeted),
-			(SELECT count(*) FROM targeted t, r WHERE t.agent_version = r.version
-				AND NOT EXISTS (SELECT 1 FROM agent_rollout_devices rd WHERE rd.rollout_id = r.id AND rd.device_id = t.id)),
-			(SELECT count(*) FROM rows WHERE state = 'issued'),
-			(SELECT count(*) FROM rows WHERE state = 'updated'),
-			(SELECT count(*) FROM rows WHERE state = 'failed'),
-			(SELECT count(*) FROM targeted t, r WHERE t.agent_version <> r.version
-				AND NOT EXISTS (SELECT 1 FROM agent_rollout_devices rd WHERE rd.rollout_id = r.id AND rd.device_id = t.id)),
-			(SELECT count(*) FROM r)`, tenantID, id).
-		Scan(&sum.Targeted, &sum.AlreadyCurrent, &sum.Issued, &sum.Updated, &sum.Failed, &sum.Remaining, &exists)
-	if err != nil {
-		return sum, err
+		SELECT r.id,
+			(SELECT count(*) FROM targeted t WHERE t.rollout_id = r.id),
+			(SELECT count(*) FROM untouched u WHERE u.rollout_id = r.id AND u.current),
+			(SELECT count(*) FROM progress p WHERE p.rollout_id = r.id AND p.state = 'issued'),
+			(SELECT count(*) FROM progress p WHERE p.rollout_id = r.id AND p.state = 'updated'),
+			(SELECT count(*) FROM progress p WHERE p.rollout_id = r.id AND p.state = 'failed'),
+			(SELECT count(*) FROM untouched u WHERE u.rollout_id = r.id AND NOT u.current)
+		FROM r`, tenantID, ids)
+	defer rows.Close()
+	out := make(map[uuid.UUID]RolloutSummary, len(ids))
+	for rows.Next() {
+		var id uuid.UUID
+		var sum RolloutSummary
+		if err := rows.Scan(&id, &sum.Targeted, &sum.AlreadyCurrent, &sum.Issued, &sum.Updated, &sum.Failed, &sum.Remaining); err != nil {
+			return nil, err
+		}
+		out[id] = sum
 	}
-	if exists == 0 { // the rollout is not in this tenant
+	return out, rows.Err()
+}
+
+// RolloutSummary is RolloutSummaries for one rollout, with ErrNotFound when
+// the rollout is not in the tenant.
+func (s *Store) RolloutSummary(ctx context.Context, tenantID, id uuid.UUID) (RolloutSummary, error) {
+	all, err := s.RolloutSummaries(ctx, tenantID, []uuid.UUID{id})
+	if err != nil {
+		return RolloutSummary{}, err
+	}
+	sum, ok := all[id]
+	if !ok {
 		return sum, ErrNotFound
 	}
 	return sum, nil
