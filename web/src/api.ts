@@ -215,3 +215,30 @@ export type ApprovalRequest = {
   last_seen: string;
   decided_at: string | null;
 };
+
+export type NotificationStatus = { smtp_configured: boolean; event_kinds: string[] };
+export type NotificationChannel = {
+  id: string;
+  kind: "email" | "webhook";
+  name: string;
+  events: string[];
+  enabled: boolean;
+  recipients: string[];
+  url: string;
+  has_secret: boolean;
+  created_at: string;
+  updated_at: string;
+};
+export type NotificationDelivery = {
+  id: number;
+  channel_id: string;
+  channel_name: string;
+  event_kind: string;
+  title: string;
+  state: "pending" | "sent" | "failed";
+  attempts: number;
+  last_error: string;
+  created_at: string;
+  sent_at: string | null;
+  next_attempt_at: string;
+};

@@ -114,4 +114,20 @@ test("first-run setup, sign in with MFA, manage groups, rules and admins", async
   await expect(card.getByLabel("Rollout state")).toHaveText("active");
   await card.getByRole("button", { name: "Cancel rollout" }).click();
   await expect(page.getByText("No rollout in progress.")).toBeVisible();
+
+  // Notifications: email disabled without SMTP; add a webhook to a closed port, test shows failure, toggle, delete.
+  await page.getByRole("link", { name: "Notifications" }).click();
+  await expect(page.getByRole("heading", { name: "Notifications" })).toBeVisible();
+  await expect(page.getByText("not configured on this server")).toBeVisible();
+  await expect(page.getByLabel("Channel kind").locator("option", { hasText: "Email" })).toBeDisabled();
+  await page.getByLabel("Channel name").fill("Dead hook");
+  await page.getByLabel("Webhook URL").fill("http://127.0.0.1:9/");
+  await page.getByRole("button", { name: "Add channel" }).click();
+  await expect(page.getByRole("cell", { name: "Dead hook", exact: true })).toBeVisible();
+  await page.getByLabel("Test Dead hook").click();
+  await expect(page.getByLabel("Test result Dead hook")).toContainText("Failed", { timeout: 20_000 });
+  await page.getByLabel("Channel Dead hook enabled").uncheck();
+  await expect(page.getByLabel("Channel Dead hook enabled")).not.toBeChecked();
+  await page.getByLabel("Delete Dead hook").click();
+  await expect(page.getByText("No channels yet.")).toBeVisible();
 });
