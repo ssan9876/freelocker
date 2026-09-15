@@ -88,6 +88,78 @@ func TestRolloutStateTransitions(t *testing.T) {
 	}
 }
 
+func TestReplaceRollout(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	s.PutRelease(ctx, tenant, store.Release{Version: "1.0.0", SHA256: make([]byte, 32), Signature: []byte("sig")})
+	s.PutRelease(ctx, tenant, store.Release{Version: "1.0.1", SHA256: make([]byte, 32), Signature: []byte("sig")})
+	now := time.Now()
+
+	// Open old rollout → replaced: new created, old cancelled.
+	old := store.Rollout{ID: uuid.New(), Version: "1.0.1", BatchSize: 5, MaxFailures: 1, State: "active", CreatedBy: "x"}
+	if err := s.CreateRollout(ctx, tenant, old); err != nil {
+		t.Fatal(err)
+	}
+	next := store.Rollout{ID: uuid.New(), Version: "1.0.0", BatchSize: 5, MaxFailures: 1, State: "active", CreatedBy: "x"}
+	if err := s.ReplaceRollout(ctx, tenant, old.ID, next, now); err != nil {
+		t.Fatalf("replace open: %v", err)
+	}
+	gotOld, err := s.GetRollout(ctx, tenant, old.ID)
+	if err != nil || gotOld.State != "cancelled" || gotOld.FinishedAt == nil {
+		t.Fatalf("old after replace = %+v, %v", gotOld, err)
+	}
+	gotNext, err := s.GetRollout(ctx, tenant, next.ID)
+	if err != nil || gotNext.Version != "1.0.0" || gotNext.State != "active" {
+		t.Fatalf("next after replace = %+v, %v", gotNext, err)
+	}
+	// Free the open slot so later creates in this test don't conflict.
+	if err := s.SetRolloutState(ctx, tenant, next.ID, []string{"active"}, "cancelled", now); err != nil {
+		t.Fatal(err)
+	}
+
+	// Already-terminal old rollout → new created, old left untouched.
+	term := store.Rollout{ID: uuid.New(), Version: "1.0.1", BatchSize: 1, MaxFailures: 0, State: "active", CreatedBy: "x"}
+	if err := s.CreateRollout(ctx, tenant, term); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetRolloutState(ctx, tenant, term.ID, []string{"active"}, "completed", now); err != nil {
+		t.Fatal(err)
+	}
+	next2 := store.Rollout{ID: uuid.New(), Version: "1.0.1", BatchSize: 1, MaxFailures: 0, State: "active", CreatedBy: "x"}
+	if err := s.ReplaceRollout(ctx, tenant, term.ID, next2, now); err != nil {
+		t.Fatalf("replace terminal: %v", err)
+	}
+	gotTerm, err := s.GetRollout(ctx, tenant, term.ID)
+	if err != nil || gotTerm.State != "completed" {
+		t.Fatalf("terminal old after replace = %+v, %v", gotTerm, err)
+	}
+	gotNext2, err := s.GetRollout(ctx, tenant, next2.ID)
+	if err != nil || gotNext2.State != "active" {
+		t.Fatalf("next2 after replace = %+v, %v", gotNext2, err)
+	}
+	// Cancel next2 so it doesn't block later opens.
+	if err := s.SetRolloutState(ctx, tenant, next2.ID, []string{"active"}, "cancelled", now); err != nil {
+		t.Fatal(err)
+	}
+
+	// Unknown version → ErrNotFound, and the old rollout must NOT be
+	// cancelled (atomicity guarantee).
+	bad := store.Rollout{ID: uuid.New(), Version: "9.9.9", BatchSize: 1, MaxFailures: 0, State: "active", CreatedBy: "x"}
+	if err := s.ReplaceRollout(ctx, tenant, term.ID, bad, now); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("bad version err = %v, want ErrNotFound", err)
+	}
+	gotTermAfter, err := s.GetRollout(ctx, tenant, term.ID)
+	if err != nil || gotTermAfter.State != "completed" {
+		t.Fatalf("term state changed on failed replace = %+v, %v", gotTermAfter, err)
+	}
+
+	// Unknown oldID → ErrNotFound.
+	if err := s.ReplaceRollout(ctx, tenant, uuid.New(), store.Rollout{ID: uuid.New(), Version: "1.0.0", BatchSize: 1, MaxFailures: 0, State: "active", CreatedBy: "x"}, now); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("unknown oldID err = %v, want ErrNotFound", err)
+	}
+}
+
 func TestOpenRolloutsSkipsSuspendedTenants(t *testing.T) {
 	ctx := context.Background()
 	s := storetest.New(t)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Rollout is a staged agent update: one release version pushed to a set of
@@ -42,15 +43,22 @@ func scanRollout(r pgx.Row) (Rollout, error) {
 	return o, err
 }
 
-// CreateRollout inserts a rollout. ErrNotFound when the version is not an
-// uploaded release of the tenant; ErrConflict when the tenant already has an
-// open (active|paused) rollout — enforced by a partial unique index so two
-// concurrent creates cannot both succeed.
-func (s *Store) CreateRollout(ctx context.Context, tenantID uuid.UUID, r Rollout) error {
+// sqlExecer is the subset of pgxpool.Pool / pgx.Tx that insertRollout needs,
+// so it can run inside or outside a transaction.
+type sqlExecer interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
+
+// insertRollout runs the guarded INSERT shared by CreateRollout and
+// ReplaceRollout. ErrNotFound when the version is not an uploaded release of
+// the tenant; ErrConflict when the tenant already has an open (active|paused)
+// rollout — enforced by a partial unique index so two concurrent inserts
+// cannot both succeed.
+func insertRollout(ctx context.Context, ex sqlExecer, tenantID uuid.UUID, r Rollout) error {
 	if r.GroupIDs == nil {
 		r.GroupIDs = []uuid.UUID{}
 	}
-	tag, err := s.pool.Exec(ctx, `
+	tag, err := ex.Exec(ctx, `
 		INSERT INTO agent_rollouts (id, tenant_id, version, group_ids, batch_size, max_failures, state, created_by)
 		SELECT $1, $2, $3, $4, $5, $6, $7, $8
 		WHERE EXISTS (SELECT 1 FROM agent_releases WHERE tenant_id = $2 AND version = $3)`,
@@ -62,6 +70,44 @@ func (s *Store) CreateRollout(ctx context.Context, tenantID uuid.UUID, r Rollout
 		return ErrNotFound
 	}
 	return nil
+}
+
+// CreateRollout inserts a rollout. See insertRollout for error semantics.
+func (s *Store) CreateRollout(ctx context.Context, tenantID uuid.UUID, r Rollout) error {
+	return insertRollout(ctx, s.pool, tenantID, r)
+}
+
+// ReplaceRollout atomically cancels `oldID` (if still active|paused) and
+// inserts `next`, so a rollback never leaves the tenant with the old rollout
+// cancelled and nothing in its place. ErrNotFound when oldID is not in the
+// tenant or next.Version is not a release; ErrConflict when another open
+// rollout blocks the insert.
+func (s *Store) ReplaceRollout(ctx context.Context, tenantID, oldID uuid.UUID, next Rollout, now time.Time) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var state string
+	err = tx.QueryRow(ctx, `SELECT state FROM agent_rollouts WHERE tenant_id = $1 AND id = $2`, tenantID, oldID).Scan(&state)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if state == "active" || state == "paused" {
+		if _, err := tx.Exec(ctx, `
+			UPDATE agent_rollouts SET state = 'cancelled', updated_at = $3, finished_at = $3
+			WHERE tenant_id = $1 AND id = $2`, tenantID, oldID, now); err != nil {
+			return err
+		}
+	}
+	if err := insertRollout(ctx, tx, tenantID, next); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *Store) GetRollout(ctx context.Context, tenantID, id uuid.UUID) (Rollout, error) {

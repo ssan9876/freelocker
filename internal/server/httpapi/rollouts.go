@@ -213,22 +213,11 @@ func (a *API) rollbackRollout(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "rollback needs a different version")
 		return
 	}
-	if _, err := a.Store.GetRelease(r.Context(), p.TenantID, req.Version); err != nil {
-		a.storeErr(w, err)
-		return
-	}
-	now := time.Now()
-	if old.State == "active" || old.State == "paused" {
-		if err := a.Store.SetRolloutState(r.Context(), p.TenantID, id, []string{"active", "paused"}, "cancelled", now); err != nil {
-			a.storeErr(w, err)
-			return
-		}
-	}
 	nr := store.Rollout{
 		ID: uuid.New(), Version: req.Version, GroupIDs: old.GroupIDs, BatchSize: old.BatchSize, MaxFailures: old.MaxFailures,
 		State: "active", CreatedBy: "admin:" + p.Admin.Email,
 	}
-	if err := a.Store.CreateRollout(r.Context(), p.TenantID, nr); err != nil {
+	if err := a.Store.ReplaceRollout(r.Context(), p.TenantID, id, nr, time.Now()); err != nil {
 		a.storeErr(w, err)
 		return
 	}

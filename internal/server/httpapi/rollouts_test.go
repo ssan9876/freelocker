@@ -101,8 +101,12 @@ func TestRolloutLifecycleOverHTTP(t *testing.T) {
 	if code := c.do("POST", "/api/rollouts/"+created.ID+"/resume", nil, nil); code != 204 {
 		t.Errorf("resume = %d", code)
 	}
+	// Cancel from paused is also allowed.
+	if code := c.do("POST", "/api/rollouts/"+created.ID+"/pause", nil, nil); code != 204 {
+		t.Errorf("pause again = %d", code)
+	}
 	if code := c.do("POST", "/api/rollouts/"+created.ID+"/cancel", nil, nil); code != 204 {
-		t.Errorf("cancel = %d", code)
+		t.Errorf("cancel from paused = %d", code)
 	}
 	c.do("GET", "/api/rollouts/"+created.ID, nil, &got)
 	if got.State != "cancelled" {
@@ -133,6 +137,17 @@ func TestRolloutLifecycleOverHTTP(t *testing.T) {
 	// Rolling back to the rollout's own version is rejected.
 	if code := c.do("POST", "/api/rollouts/"+rb2.ID+"/rollback", map[string]string{"version": "1.0.1"}, nil); code != 400 {
 		t.Errorf("rollback to same version = %d, want 400", code)
+	}
+	// Rolling back to an unknown version is rejected, and leaves the source
+	// rollout's state unchanged (the atomicity guarantee).
+	var beforeBadRollback rolloutJSON
+	c.do("GET", "/api/rollouts/"+rb2.ID, nil, &beforeBadRollback)
+	if code := c.do("POST", "/api/rollouts/"+rb2.ID+"/rollback", map[string]string{"version": "9.9.9"}, nil); code != 404 {
+		t.Errorf("rollback to unknown version = %d, want 404", code)
+	}
+	c.do("GET", "/api/rollouts/"+rb2.ID, nil, &got)
+	if got.State != beforeBadRollback.State {
+		t.Errorf("source rollout state changed after failed rollback: was %s, now %s", beforeBadRollback.State, got.State)
 	}
 
 	// Audit trail.
