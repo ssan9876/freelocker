@@ -370,8 +370,58 @@ func TestRolloutSummaryRemainingIsACount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Targeted drops to 1 (b) while Updated still counts revoked a.
-	if sum.Targeted != 1 || sum.Updated != 1 || sum.Remaining != 1 {
+	// Revoking a drops it from both Targeted and Updated, so a subtraction
+	// would put Remaining at 0 even though b has never been issued to.
+	if sum.Targeted != 1 || sum.Updated != 0 || sum.Remaining != 1 {
 		t.Fatalf("summary = %+v, want Remaining 1 (b is untouched and still on 1.0.0)", sum)
+	}
+}
+
+// A device revoked mid-rollout leaves the rollout: it is no longer targeted,
+// so it must not hold an issued slot (which blocks completion) nor count as a
+// failure (which would auto-pause the rollout over a deliberate removal).
+func TestRevokedDeviceLeavesRollout(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	a := enrollTestDevice(t, s, tenant, nil, "a", "1.0.0")
+	enrollTestDevice(t, s, tenant, nil, "b", "1.0.0")
+	r := newTestRollout(t, s, tenant, nil)
+
+	now := time.Now()
+	cmd := uuid.New()
+	if err := s.CreateCommand(ctx, tenant, store.Command{ID: cmd, DeviceID: a, Type: "update_agent", IssuedAt: now, ExpiresAt: now.Add(time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddRolloutDevice(ctx, r.ID, a, cmd, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RevokeDevice(ctx, tenant, a); err != nil {
+		t.Fatal(err)
+	}
+
+	// Resolved right away — no waiting for the confirm timeout — and the
+	// removal is not reported as a failure.
+	up, fail, err := s.ResolveRolloutDevices(ctx, tenant, r.ID, now, 10*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if up != 0 || fail != 0 {
+		t.Errorf("resolve = %d updated, %d failed; want 0, 0 (revocation is not a failure)", up, fail)
+	}
+	sum, err := s.RolloutSummary(ctx, tenant, r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Targeted != 1 || sum.Issued != 0 || sum.Failed != 0 || sum.Updated != 0 || sum.Remaining != 1 {
+		t.Errorf("summary = %+v, want only b: Targeted 1, Remaining 1, no issued/failed", sum)
+	}
+	// The row stays visible in the device table as history.
+	devs, err := s.ListRolloutDevices(ctx, tenant, r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) != 1 || devs[0].State != "cancelled" {
+		t.Errorf("rollout devices = %+v, want one cancelled row", devs)
 	}
 }

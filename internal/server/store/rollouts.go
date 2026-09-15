@@ -233,10 +233,14 @@ func (s *Store) ListRolloutDevices(ctx context.Context, tenantID, id uuid.UUID) 
 }
 
 // ResolveRolloutDevices moves issued rows to a terminal state:
-//   - updated: the device now reports the rollout version;
-//   - failed:  the command failed or expired, or it succeeded before
-//     now−confirmTimeout and the device still reports another version.
-// Returns how many rows became updated and failed.
+//   - updated:   the device now reports the rollout version;
+//   - failed:    the command failed or expired, or it succeeded before
+//     now−confirmTimeout and the device still reports another version;
+//   - cancelled: the device was revoked, so it is no longer targeted.
+//
+// Returns how many rows became updated and failed. Cancelled rows are in
+// neither tally: revoking a device is an admin action, not a rollout failure,
+// and counting it would auto-pause the rollout.
 func (s *Store) ResolveRolloutDevices(ctx context.Context, tenantID, id uuid.UUID, now time.Time, confirmTimeout time.Duration) (updated, failed int, err error) {
 	cutoff := now.Add(-confirmTimeout)
 	rows, err := s.pool.Query(ctx, `
@@ -244,11 +248,13 @@ func (s *Store) ResolveRolloutDevices(ctx context.Context, tenantID, id uuid.UUI
 		FROM (
 			SELECT rd.device_id,
 				CASE
+					WHEN d.revoked THEN 'cancelled'
 					WHEN d.agent_version = r.version THEN 'updated'
 					WHEN c.state IN ('failed', 'expired') THEN 'failed'
 					WHEN c.state = 'succeeded' AND c.completed_at <= $4 THEN 'failed'
 				END AS state,
 				CASE
+					WHEN d.revoked THEN 'device revoked'
 					WHEN d.agent_version = r.version THEN ''
 					WHEN c.state IN ('failed', 'expired') THEN c.state || ': ' || c.result
 					ELSE 'agent did not report ' || r.version || ' after the update command succeeded'
@@ -270,9 +276,10 @@ func (s *Store) ResolveRolloutDevices(ctx context.Context, tenantID, id uuid.UUI
 		if err := rows.Scan(&st); err != nil {
 			return 0, 0, err
 		}
-		if st == "updated" {
+		switch st {
+		case "updated":
 			updated++
-		} else {
+		case "failed":
 			failed++
 		}
 	}
@@ -288,7 +295,13 @@ func (s *Store) RolloutSummary(ctx context.Context, tenantID, id uuid.UUID) (Rol
 			SELECT d.id, d.agent_version FROM devices d, r
 			WHERE d.tenant_id = $1 AND NOT d.revoked AND (cardinality(r.group_ids) = 0 OR d.group_id = ANY(r.group_ids))
 		),
-		rows AS (SELECT state FROM agent_rollout_devices rd, r WHERE rd.rollout_id = r.id)
+		-- Progress rows for revoked devices are excluded exactly as they are
+		-- from targeted, so the state counts always add up against it.
+		rows AS (
+			SELECT rd.state FROM agent_rollout_devices rd
+			JOIN r ON r.id = rd.rollout_id
+			JOIN devices d ON d.id = rd.device_id AND NOT d.revoked
+		)
 		SELECT
 			(SELECT count(*) FROM targeted),
 			(SELECT count(*) FROM targeted t, r WHERE t.agent_version = r.version
