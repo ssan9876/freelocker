@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, ApiError, LoginResult } from "../api";
 import { useAuth } from "../auth";
+import { BrandMark } from "../components/icons";
 
 export function Login() {
   const [email, setEmail] = useState("");
@@ -30,7 +31,7 @@ export function Login() {
     <div className="auth-wrap">
       <form className="auth-card" onSubmit={submit}>
         <h1 className="brand">
-          <span className="lock">▣</span> FreeLocker
+          <BrandMark /> FreeLocker
         </h1>
         <p className="auth-sub">Sign in to the management console.</p>
         <label>Email</label>

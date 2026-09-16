@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { api, ApiError } from "../api";
+import { BrandMark } from "../components/icons";
 
 export function Setup({ onDone }: { onDone: () => void }) {
   const [org, setOrg] = useState("");
@@ -25,7 +26,7 @@ export function Setup({ onDone }: { onDone: () => void }) {
     <div className="auth-wrap">
       <form className="auth-card" onSubmit={submit}>
         <h1 className="brand">
-          <span className="lock">▣</span> FreeLocker
+          <BrandMark /> FreeLocker
         </h1>
         <p className="auth-sub">Create your organization and the first owner account.</p>
         <label>Organization name</label>

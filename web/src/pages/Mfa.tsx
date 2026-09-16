@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, ApiError, MfaSetup } from "../api";
 import { useAuth } from "../auth";
+import { BrandMark } from "../components/icons";
 
 // The login response tells us whether MFA is already enrolled; we keep it
 // in sessionStorage so a refresh on /mfa still knows which flow to show.
@@ -48,7 +49,7 @@ export function Mfa() {
     <div className="auth-wrap">
       <form className="auth-card" onSubmit={submit}>
         <h1 className="brand">
-          <span className="lock">▣</span> FreeLocker
+          <BrandMark /> FreeLocker
         </h1>
         {enrolled === false ? (
           <>
