@@ -19,6 +19,8 @@ service Agent {
   rpc ReportMetrics(MetricsRequest) returns (Ack);
   rpc GetControls(GetControlsRequest) returns (ControlsResponse);
   rpc ReportEvents(EventsRequest) returns (Ack);
+  rpc GetRingfence(GetRingfenceRequest) returns (GetRingfenceResponse);
+  rpc ReportRingfenceEvents(ReportRingfenceEventsRequest) returns (Ack);
 }
 
 message DeviceEvent {
@@ -176,4 +178,35 @@ message RenewRequest {
 
 message RenewResponse {
   bytes cert_der = 1;
+}
+
+message GetRingfenceRequest {}
+
+message RingfenceProgram {
+  string path = 1;
+  bool network_blocked = 2;
+}
+
+message RingfenceProtection {
+  string asr_rule = 1; // ASR GUID
+  string action = 2;   // audit | block
+}
+
+message GetRingfenceResponse {
+  string version = 1; // content hash; empty means no ringfence assigned
+  string mode = 2;    // audit | enforce
+  repeated RingfenceProgram programs = 3;
+  repeated RingfenceProtection protections = 4;
+}
+
+message RingfenceEvent {
+  string kind = 1;    // network | child_process
+  string program = 2;
+  string detail = 3;
+  bool enforced = 4;  // false = would have blocked (audit)
+  int64 at_unix = 5;
+}
+
+message ReportRingfenceEventsRequest {
+  repeated RingfenceEvent events = 1;
 }

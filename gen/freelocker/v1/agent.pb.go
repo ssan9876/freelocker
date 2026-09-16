@@ -1580,6 +1580,334 @@ func (x *RenewResponse) GetCertDer() []byte {
 	return nil
 }
 
+type GetRingfenceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRingfenceRequest) Reset() {
+	*x = GetRingfenceRequest{}
+	mi := &file_freelocker_v1_agent_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRingfenceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRingfenceRequest) ProtoMessage() {}
+
+func (x *GetRingfenceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_freelocker_v1_agent_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRingfenceRequest.ProtoReflect.Descriptor instead.
+func (*GetRingfenceRequest) Descriptor() ([]byte, []int) {
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{25}
+}
+
+type RingfenceProgram struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Path           string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	NetworkBlocked bool                   `protobuf:"varint,2,opt,name=network_blocked,json=networkBlocked,proto3" json:"network_blocked,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RingfenceProgram) Reset() {
+	*x = RingfenceProgram{}
+	mi := &file_freelocker_v1_agent_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RingfenceProgram) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RingfenceProgram) ProtoMessage() {}
+
+func (x *RingfenceProgram) ProtoReflect() protoreflect.Message {
+	mi := &file_freelocker_v1_agent_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RingfenceProgram.ProtoReflect.Descriptor instead.
+func (*RingfenceProgram) Descriptor() ([]byte, []int) {
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *RingfenceProgram) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *RingfenceProgram) GetNetworkBlocked() bool {
+	if x != nil {
+		return x.NetworkBlocked
+	}
+	return false
+}
+
+type RingfenceProtection struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AsrRule       string                 `protobuf:"bytes,1,opt,name=asr_rule,json=asrRule,proto3" json:"asr_rule,omitempty"` // ASR GUID
+	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`                  // audit | block
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RingfenceProtection) Reset() {
+	*x = RingfenceProtection{}
+	mi := &file_freelocker_v1_agent_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RingfenceProtection) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RingfenceProtection) ProtoMessage() {}
+
+func (x *RingfenceProtection) ProtoReflect() protoreflect.Message {
+	mi := &file_freelocker_v1_agent_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RingfenceProtection.ProtoReflect.Descriptor instead.
+func (*RingfenceProtection) Descriptor() ([]byte, []int) {
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *RingfenceProtection) GetAsrRule() string {
+	if x != nil {
+		return x.AsrRule
+	}
+	return ""
+}
+
+func (x *RingfenceProtection) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+type GetRingfenceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Version       string                 `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"` // content hash; empty means no ringfence assigned
+	Mode          string                 `protobuf:"bytes,2,opt,name=mode,proto3" json:"mode,omitempty"`       // audit | enforce
+	Programs      []*RingfenceProgram    `protobuf:"bytes,3,rep,name=programs,proto3" json:"programs,omitempty"`
+	Protections   []*RingfenceProtection `protobuf:"bytes,4,rep,name=protections,proto3" json:"protections,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRingfenceResponse) Reset() {
+	*x = GetRingfenceResponse{}
+	mi := &file_freelocker_v1_agent_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRingfenceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRingfenceResponse) ProtoMessage() {}
+
+func (x *GetRingfenceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_freelocker_v1_agent_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRingfenceResponse.ProtoReflect.Descriptor instead.
+func (*GetRingfenceResponse) Descriptor() ([]byte, []int) {
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *GetRingfenceResponse) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *GetRingfenceResponse) GetMode() string {
+	if x != nil {
+		return x.Mode
+	}
+	return ""
+}
+
+func (x *GetRingfenceResponse) GetPrograms() []*RingfenceProgram {
+	if x != nil {
+		return x.Programs
+	}
+	return nil
+}
+
+func (x *GetRingfenceResponse) GetProtections() []*RingfenceProtection {
+	if x != nil {
+		return x.Protections
+	}
+	return nil
+}
+
+type RingfenceEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"` // network | child_process
+	Program       string                 `protobuf:"bytes,2,opt,name=program,proto3" json:"program,omitempty"`
+	Detail        string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
+	Enforced      bool                   `protobuf:"varint,4,opt,name=enforced,proto3" json:"enforced,omitempty"` // false = would have blocked (audit)
+	AtUnix        int64                  `protobuf:"varint,5,opt,name=at_unix,json=atUnix,proto3" json:"at_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RingfenceEvent) Reset() {
+	*x = RingfenceEvent{}
+	mi := &file_freelocker_v1_agent_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RingfenceEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RingfenceEvent) ProtoMessage() {}
+
+func (x *RingfenceEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_freelocker_v1_agent_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RingfenceEvent.ProtoReflect.Descriptor instead.
+func (*RingfenceEvent) Descriptor() ([]byte, []int) {
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *RingfenceEvent) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *RingfenceEvent) GetProgram() string {
+	if x != nil {
+		return x.Program
+	}
+	return ""
+}
+
+func (x *RingfenceEvent) GetDetail() string {
+	if x != nil {
+		return x.Detail
+	}
+	return ""
+}
+
+func (x *RingfenceEvent) GetEnforced() bool {
+	if x != nil {
+		return x.Enforced
+	}
+	return false
+}
+
+func (x *RingfenceEvent) GetAtUnix() int64 {
+	if x != nil {
+		return x.AtUnix
+	}
+	return 0
+}
+
+type ReportRingfenceEventsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Events        []*RingfenceEvent      `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportRingfenceEventsRequest) Reset() {
+	*x = ReportRingfenceEventsRequest{}
+	mi := &file_freelocker_v1_agent_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportRingfenceEventsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportRingfenceEventsRequest) ProtoMessage() {}
+
+func (x *ReportRingfenceEventsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_freelocker_v1_agent_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportRingfenceEventsRequest.ProtoReflect.Descriptor instead.
+func (*ReportRingfenceEventsRequest) Descriptor() ([]byte, []int) {
+	return file_freelocker_v1_agent_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ReportRingfenceEventsRequest) GetEvents() []*RingfenceEvent {
+	if x != nil {
+		return x.Events
+	}
+	return nil
+}
+
 var File_freelocker_v1_agent_proto protoreflect.FileDescriptor
 
 const file_freelocker_v1_agent_proto_rawDesc = "" +
@@ -1683,7 +2011,27 @@ const file_freelocker_v1_agent_proto_rawDesc = "" +
 	"\fRenewRequest\x12\x17\n" +
 	"\acsr_der\x18\x01 \x01(\fR\x06csrDer\"*\n" +
 	"\rRenewResponse\x12\x19\n" +
-	"\bcert_der\x18\x01 \x01(\fR\acertDer*\xc6\x01\n" +
+	"\bcert_der\x18\x01 \x01(\fR\acertDer\"\x15\n" +
+	"\x13GetRingfenceRequest\"O\n" +
+	"\x10RingfenceProgram\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12'\n" +
+	"\x0fnetwork_blocked\x18\x02 \x01(\bR\x0enetworkBlocked\"H\n" +
+	"\x13RingfenceProtection\x12\x19\n" +
+	"\basr_rule\x18\x01 \x01(\tR\aasrRule\x12\x16\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action\"\xc7\x01\n" +
+	"\x14GetRingfenceResponse\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\tR\aversion\x12\x12\n" +
+	"\x04mode\x18\x02 \x01(\tR\x04mode\x12;\n" +
+	"\bprograms\x18\x03 \x03(\v2\x1f.freelocker.v1.RingfenceProgramR\bprograms\x12D\n" +
+	"\vprotections\x18\x04 \x03(\v2\".freelocker.v1.RingfenceProtectionR\vprotections\"\x8b\x01\n" +
+	"\x0eRingfenceEvent\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x18\n" +
+	"\aprogram\x18\x02 \x01(\tR\aprogram\x12\x16\n" +
+	"\x06detail\x18\x03 \x01(\tR\x06detail\x12\x1a\n" +
+	"\benforced\x18\x04 \x01(\bR\benforced\x12\x17\n" +
+	"\aat_unix\x18\x05 \x01(\x03R\x06atUnix\"U\n" +
+	"\x1cReportRingfenceEventsRequest\x125\n" +
+	"\x06events\x18\x01 \x03(\v2\x1d.freelocker.v1.RingfenceEventR\x06events*\xc6\x01\n" +
 	"\vCommandType\x12\x1c\n" +
 	"\x18COMMAND_TYPE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11COMMAND_TYPE_PING\x10\x01\x12\"\n" +
@@ -1693,7 +2041,7 @@ const file_freelocker_v1_agent_proto_rawDesc = "" +
 	"\x19COMMAND_TYPE_UPDATE_AGENT\x10\x052S\n" +
 	"\n" +
 	"Enrollment\x12E\n" +
-	"\x06Enroll\x12\x1c.freelocker.v1.EnrollRequest\x1a\x1d.freelocker.v1.EnrollResponse2\xcf\x04\n" +
+	"\x06Enroll\x12\x1c.freelocker.v1.EnrollRequest\x1a\x1d.freelocker.v1.EnrollResponse2\x82\x06\n" +
 	"\x05Agent\x12H\n" +
 	"\aConnect\x12\x1b.freelocker.v1.AgentMessage\x1a\x1c.freelocker.v1.ServerMessage(\x010\x01\x12M\n" +
 	"\x10RenewCertificate\x12\x1b.freelocker.v1.RenewRequest\x1a\x1c.freelocker.v1.RenewResponse\x12N\n" +
@@ -1702,7 +2050,9 @@ const file_freelocker_v1_agent_proto_rawDesc = "" +
 	"\fReportBlocks\x12\".freelocker.v1.ReportBlocksRequest\x1a\x12.freelocker.v1.Ack\x12B\n" +
 	"\rReportMetrics\x12\x1d.freelocker.v1.MetricsRequest\x1a\x12.freelocker.v1.Ack\x12Q\n" +
 	"\vGetControls\x12!.freelocker.v1.GetControlsRequest\x1a\x1f.freelocker.v1.ControlsResponse\x12@\n" +
-	"\fReportEvents\x12\x1c.freelocker.v1.EventsRequest\x1a\x12.freelocker.v1.AckB#Z!freelocker/gen/freelocker/v1;flv1b\x06proto3"
+	"\fReportEvents\x12\x1c.freelocker.v1.EventsRequest\x1a\x12.freelocker.v1.Ack\x12W\n" +
+	"\fGetRingfence\x12\".freelocker.v1.GetRingfenceRequest\x1a#.freelocker.v1.GetRingfenceResponse\x12X\n" +
+	"\x15ReportRingfenceEvents\x12+.freelocker.v1.ReportRingfenceEventsRequest\x1a\x12.freelocker.v1.AckB#Z!freelocker/gen/freelocker/v1;flv1b\x06proto3"
 
 var (
 	file_freelocker_v1_agent_proto_rawDescOnce sync.Once
@@ -1717,34 +2067,40 @@ func file_freelocker_v1_agent_proto_rawDescGZIP() []byte {
 }
 
 var file_freelocker_v1_agent_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_freelocker_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_freelocker_v1_agent_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_freelocker_v1_agent_proto_goTypes = []any{
-	(CommandType)(0),            // 0: freelocker.v1.CommandType
-	(*DeviceEvent)(nil),         // 1: freelocker.v1.DeviceEvent
-	(*EventsRequest)(nil),       // 2: freelocker.v1.EventsRequest
-	(*GetControlsRequest)(nil),  // 3: freelocker.v1.GetControlsRequest
-	(*ControlsResponse)(nil),    // 4: freelocker.v1.ControlsResponse
-	(*MetricsRequest)(nil),      // 5: freelocker.v1.MetricsRequest
-	(*Ack)(nil),                 // 6: freelocker.v1.Ack
-	(*GetPolicyRequest)(nil),    // 7: freelocker.v1.GetPolicyRequest
-	(*GetPolicyResponse)(nil),   // 8: freelocker.v1.GetPolicyResponse
-	(*ObservedApp)(nil),         // 9: freelocker.v1.ObservedApp
-	(*ObserveRequest)(nil),      // 10: freelocker.v1.ObserveRequest
-	(*BlockEvent)(nil),          // 11: freelocker.v1.BlockEvent
-	(*ReportBlocksRequest)(nil), // 12: freelocker.v1.ReportBlocksRequest
-	(*HardwareInfo)(nil),        // 13: freelocker.v1.HardwareInfo
-	(*EnrollRequest)(nil),       // 14: freelocker.v1.EnrollRequest
-	(*EnrollResponse)(nil),      // 15: freelocker.v1.EnrollResponse
-	(*Inventory)(nil),           // 16: freelocker.v1.Inventory
-	(*Heartbeat)(nil),           // 17: freelocker.v1.Heartbeat
-	(*CommandResult)(nil),       // 18: freelocker.v1.CommandResult
-	(*Goodbye)(nil),             // 19: freelocker.v1.Goodbye
-	(*AgentMessage)(nil),        // 20: freelocker.v1.AgentMessage
-	(*Command)(nil),             // 21: freelocker.v1.Command
-	(*SignedCommand)(nil),       // 22: freelocker.v1.SignedCommand
-	(*ServerMessage)(nil),       // 23: freelocker.v1.ServerMessage
-	(*RenewRequest)(nil),        // 24: freelocker.v1.RenewRequest
-	(*RenewResponse)(nil),       // 25: freelocker.v1.RenewResponse
+	(CommandType)(0),                     // 0: freelocker.v1.CommandType
+	(*DeviceEvent)(nil),                  // 1: freelocker.v1.DeviceEvent
+	(*EventsRequest)(nil),                // 2: freelocker.v1.EventsRequest
+	(*GetControlsRequest)(nil),           // 3: freelocker.v1.GetControlsRequest
+	(*ControlsResponse)(nil),             // 4: freelocker.v1.ControlsResponse
+	(*MetricsRequest)(nil),               // 5: freelocker.v1.MetricsRequest
+	(*Ack)(nil),                          // 6: freelocker.v1.Ack
+	(*GetPolicyRequest)(nil),             // 7: freelocker.v1.GetPolicyRequest
+	(*GetPolicyResponse)(nil),            // 8: freelocker.v1.GetPolicyResponse
+	(*ObservedApp)(nil),                  // 9: freelocker.v1.ObservedApp
+	(*ObserveRequest)(nil),               // 10: freelocker.v1.ObserveRequest
+	(*BlockEvent)(nil),                   // 11: freelocker.v1.BlockEvent
+	(*ReportBlocksRequest)(nil),          // 12: freelocker.v1.ReportBlocksRequest
+	(*HardwareInfo)(nil),                 // 13: freelocker.v1.HardwareInfo
+	(*EnrollRequest)(nil),                // 14: freelocker.v1.EnrollRequest
+	(*EnrollResponse)(nil),               // 15: freelocker.v1.EnrollResponse
+	(*Inventory)(nil),                    // 16: freelocker.v1.Inventory
+	(*Heartbeat)(nil),                    // 17: freelocker.v1.Heartbeat
+	(*CommandResult)(nil),                // 18: freelocker.v1.CommandResult
+	(*Goodbye)(nil),                      // 19: freelocker.v1.Goodbye
+	(*AgentMessage)(nil),                 // 20: freelocker.v1.AgentMessage
+	(*Command)(nil),                      // 21: freelocker.v1.Command
+	(*SignedCommand)(nil),                // 22: freelocker.v1.SignedCommand
+	(*ServerMessage)(nil),                // 23: freelocker.v1.ServerMessage
+	(*RenewRequest)(nil),                 // 24: freelocker.v1.RenewRequest
+	(*RenewResponse)(nil),                // 25: freelocker.v1.RenewResponse
+	(*GetRingfenceRequest)(nil),          // 26: freelocker.v1.GetRingfenceRequest
+	(*RingfenceProgram)(nil),             // 27: freelocker.v1.RingfenceProgram
+	(*RingfenceProtection)(nil),          // 28: freelocker.v1.RingfenceProtection
+	(*GetRingfenceResponse)(nil),         // 29: freelocker.v1.GetRingfenceResponse
+	(*RingfenceEvent)(nil),               // 30: freelocker.v1.RingfenceEvent
+	(*ReportRingfenceEventsRequest)(nil), // 31: freelocker.v1.ReportRingfenceEventsRequest
 }
 var file_freelocker_v1_agent_proto_depIdxs = []int32{
 	1,  // 0: freelocker.v1.EventsRequest.events:type_name -> freelocker.v1.DeviceEvent
@@ -1757,29 +2113,36 @@ var file_freelocker_v1_agent_proto_depIdxs = []int32{
 	19, // 7: freelocker.v1.AgentMessage.goodbye:type_name -> freelocker.v1.Goodbye
 	0,  // 8: freelocker.v1.Command.type:type_name -> freelocker.v1.CommandType
 	22, // 9: freelocker.v1.ServerMessage.command:type_name -> freelocker.v1.SignedCommand
-	14, // 10: freelocker.v1.Enrollment.Enroll:input_type -> freelocker.v1.EnrollRequest
-	20, // 11: freelocker.v1.Agent.Connect:input_type -> freelocker.v1.AgentMessage
-	24, // 12: freelocker.v1.Agent.RenewCertificate:input_type -> freelocker.v1.RenewRequest
-	7,  // 13: freelocker.v1.Agent.GetPolicy:input_type -> freelocker.v1.GetPolicyRequest
-	10, // 14: freelocker.v1.Agent.Observe:input_type -> freelocker.v1.ObserveRequest
-	12, // 15: freelocker.v1.Agent.ReportBlocks:input_type -> freelocker.v1.ReportBlocksRequest
-	5,  // 16: freelocker.v1.Agent.ReportMetrics:input_type -> freelocker.v1.MetricsRequest
-	3,  // 17: freelocker.v1.Agent.GetControls:input_type -> freelocker.v1.GetControlsRequest
-	2,  // 18: freelocker.v1.Agent.ReportEvents:input_type -> freelocker.v1.EventsRequest
-	15, // 19: freelocker.v1.Enrollment.Enroll:output_type -> freelocker.v1.EnrollResponse
-	23, // 20: freelocker.v1.Agent.Connect:output_type -> freelocker.v1.ServerMessage
-	25, // 21: freelocker.v1.Agent.RenewCertificate:output_type -> freelocker.v1.RenewResponse
-	8,  // 22: freelocker.v1.Agent.GetPolicy:output_type -> freelocker.v1.GetPolicyResponse
-	6,  // 23: freelocker.v1.Agent.Observe:output_type -> freelocker.v1.Ack
-	6,  // 24: freelocker.v1.Agent.ReportBlocks:output_type -> freelocker.v1.Ack
-	6,  // 25: freelocker.v1.Agent.ReportMetrics:output_type -> freelocker.v1.Ack
-	4,  // 26: freelocker.v1.Agent.GetControls:output_type -> freelocker.v1.ControlsResponse
-	6,  // 27: freelocker.v1.Agent.ReportEvents:output_type -> freelocker.v1.Ack
-	19, // [19:28] is the sub-list for method output_type
-	10, // [10:19] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	27, // 10: freelocker.v1.GetRingfenceResponse.programs:type_name -> freelocker.v1.RingfenceProgram
+	28, // 11: freelocker.v1.GetRingfenceResponse.protections:type_name -> freelocker.v1.RingfenceProtection
+	30, // 12: freelocker.v1.ReportRingfenceEventsRequest.events:type_name -> freelocker.v1.RingfenceEvent
+	14, // 13: freelocker.v1.Enrollment.Enroll:input_type -> freelocker.v1.EnrollRequest
+	20, // 14: freelocker.v1.Agent.Connect:input_type -> freelocker.v1.AgentMessage
+	24, // 15: freelocker.v1.Agent.RenewCertificate:input_type -> freelocker.v1.RenewRequest
+	7,  // 16: freelocker.v1.Agent.GetPolicy:input_type -> freelocker.v1.GetPolicyRequest
+	10, // 17: freelocker.v1.Agent.Observe:input_type -> freelocker.v1.ObserveRequest
+	12, // 18: freelocker.v1.Agent.ReportBlocks:input_type -> freelocker.v1.ReportBlocksRequest
+	5,  // 19: freelocker.v1.Agent.ReportMetrics:input_type -> freelocker.v1.MetricsRequest
+	3,  // 20: freelocker.v1.Agent.GetControls:input_type -> freelocker.v1.GetControlsRequest
+	2,  // 21: freelocker.v1.Agent.ReportEvents:input_type -> freelocker.v1.EventsRequest
+	26, // 22: freelocker.v1.Agent.GetRingfence:input_type -> freelocker.v1.GetRingfenceRequest
+	31, // 23: freelocker.v1.Agent.ReportRingfenceEvents:input_type -> freelocker.v1.ReportRingfenceEventsRequest
+	15, // 24: freelocker.v1.Enrollment.Enroll:output_type -> freelocker.v1.EnrollResponse
+	23, // 25: freelocker.v1.Agent.Connect:output_type -> freelocker.v1.ServerMessage
+	25, // 26: freelocker.v1.Agent.RenewCertificate:output_type -> freelocker.v1.RenewResponse
+	8,  // 27: freelocker.v1.Agent.GetPolicy:output_type -> freelocker.v1.GetPolicyResponse
+	6,  // 28: freelocker.v1.Agent.Observe:output_type -> freelocker.v1.Ack
+	6,  // 29: freelocker.v1.Agent.ReportBlocks:output_type -> freelocker.v1.Ack
+	6,  // 30: freelocker.v1.Agent.ReportMetrics:output_type -> freelocker.v1.Ack
+	4,  // 31: freelocker.v1.Agent.GetControls:output_type -> freelocker.v1.ControlsResponse
+	6,  // 32: freelocker.v1.Agent.ReportEvents:output_type -> freelocker.v1.Ack
+	29, // 33: freelocker.v1.Agent.GetRingfence:output_type -> freelocker.v1.GetRingfenceResponse
+	6,  // 34: freelocker.v1.Agent.ReportRingfenceEvents:output_type -> freelocker.v1.Ack
+	24, // [24:35] is the sub-list for method output_type
+	13, // [13:24] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_freelocker_v1_agent_proto_init() }
@@ -1801,7 +2164,7 @@ func file_freelocker_v1_agent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_freelocker_v1_agent_proto_rawDesc), len(file_freelocker_v1_agent_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   25,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

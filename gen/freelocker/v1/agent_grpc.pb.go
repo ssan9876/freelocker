@@ -125,14 +125,16 @@ var Enrollment_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	Agent_Connect_FullMethodName          = "/freelocker.v1.Agent/Connect"
-	Agent_RenewCertificate_FullMethodName = "/freelocker.v1.Agent/RenewCertificate"
-	Agent_GetPolicy_FullMethodName        = "/freelocker.v1.Agent/GetPolicy"
-	Agent_Observe_FullMethodName          = "/freelocker.v1.Agent/Observe"
-	Agent_ReportBlocks_FullMethodName     = "/freelocker.v1.Agent/ReportBlocks"
-	Agent_ReportMetrics_FullMethodName    = "/freelocker.v1.Agent/ReportMetrics"
-	Agent_GetControls_FullMethodName      = "/freelocker.v1.Agent/GetControls"
-	Agent_ReportEvents_FullMethodName     = "/freelocker.v1.Agent/ReportEvents"
+	Agent_Connect_FullMethodName               = "/freelocker.v1.Agent/Connect"
+	Agent_RenewCertificate_FullMethodName      = "/freelocker.v1.Agent/RenewCertificate"
+	Agent_GetPolicy_FullMethodName             = "/freelocker.v1.Agent/GetPolicy"
+	Agent_Observe_FullMethodName               = "/freelocker.v1.Agent/Observe"
+	Agent_ReportBlocks_FullMethodName          = "/freelocker.v1.Agent/ReportBlocks"
+	Agent_ReportMetrics_FullMethodName         = "/freelocker.v1.Agent/ReportMetrics"
+	Agent_GetControls_FullMethodName           = "/freelocker.v1.Agent/GetControls"
+	Agent_ReportEvents_FullMethodName          = "/freelocker.v1.Agent/ReportEvents"
+	Agent_GetRingfence_FullMethodName          = "/freelocker.v1.Agent/GetRingfence"
+	Agent_ReportRingfenceEvents_FullMethodName = "/freelocker.v1.Agent/ReportRingfenceEvents"
 )
 
 // AgentClient is the client API for Agent service.
@@ -149,6 +151,8 @@ type AgentClient interface {
 	ReportMetrics(ctx context.Context, in *MetricsRequest, opts ...grpc.CallOption) (*Ack, error)
 	GetControls(ctx context.Context, in *GetControlsRequest, opts ...grpc.CallOption) (*ControlsResponse, error)
 	ReportEvents(ctx context.Context, in *EventsRequest, opts ...grpc.CallOption) (*Ack, error)
+	GetRingfence(ctx context.Context, in *GetRingfenceRequest, opts ...grpc.CallOption) (*GetRingfenceResponse, error)
+	ReportRingfenceEvents(ctx context.Context, in *ReportRingfenceEventsRequest, opts ...grpc.CallOption) (*Ack, error)
 }
 
 type agentClient struct {
@@ -242,6 +246,26 @@ func (c *agentClient) ReportEvents(ctx context.Context, in *EventsRequest, opts 
 	return out, nil
 }
 
+func (c *agentClient) GetRingfence(ctx context.Context, in *GetRingfenceRequest, opts ...grpc.CallOption) (*GetRingfenceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetRingfenceResponse)
+	err := c.cc.Invoke(ctx, Agent_GetRingfence_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) ReportRingfenceEvents(ctx context.Context, in *ReportRingfenceEventsRequest, opts ...grpc.CallOption) (*Ack, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Ack)
+	err := c.cc.Invoke(ctx, Agent_ReportRingfenceEvents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentServer is the server API for Agent service.
 // All implementations must embed UnimplementedAgentServer
 // for forward compatibility.
@@ -256,6 +280,8 @@ type AgentServer interface {
 	ReportMetrics(context.Context, *MetricsRequest) (*Ack, error)
 	GetControls(context.Context, *GetControlsRequest) (*ControlsResponse, error)
 	ReportEvents(context.Context, *EventsRequest) (*Ack, error)
+	GetRingfence(context.Context, *GetRingfenceRequest) (*GetRingfenceResponse, error)
+	ReportRingfenceEvents(context.Context, *ReportRingfenceEventsRequest) (*Ack, error)
 	mustEmbedUnimplementedAgentServer()
 }
 
@@ -289,6 +315,12 @@ func (UnimplementedAgentServer) GetControls(context.Context, *GetControlsRequest
 }
 func (UnimplementedAgentServer) ReportEvents(context.Context, *EventsRequest) (*Ack, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReportEvents not implemented")
+}
+func (UnimplementedAgentServer) GetRingfence(context.Context, *GetRingfenceRequest) (*GetRingfenceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRingfence not implemented")
+}
+func (UnimplementedAgentServer) ReportRingfenceEvents(context.Context, *ReportRingfenceEventsRequest) (*Ack, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReportRingfenceEvents not implemented")
 }
 func (UnimplementedAgentServer) mustEmbedUnimplementedAgentServer() {}
 func (UnimplementedAgentServer) testEmbeddedByValue()               {}
@@ -444,6 +476,42 @@ func _Agent_ReportEvents_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Agent_GetRingfence_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRingfenceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).GetRingfence(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_GetRingfence_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).GetRingfence(ctx, req.(*GetRingfenceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_ReportRingfenceEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReportRingfenceEventsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).ReportRingfenceEvents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_ReportRingfenceEvents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).ReportRingfenceEvents(ctx, req.(*ReportRingfenceEventsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Agent_ServiceDesc is the grpc.ServiceDesc for Agent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -478,6 +546,14 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReportEvents",
 			Handler:    _Agent_ReportEvents_Handler,
+		},
+		{
+			MethodName: "GetRingfence",
+			Handler:    _Agent_GetRingfence_Handler,
+		},
+		{
+			MethodName: "ReportRingfenceEvents",
+			Handler:    _Agent_ReportRingfenceEvents_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
