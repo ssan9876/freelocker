@@ -42,6 +42,18 @@ func TestDiffAddsMissingAndRemovesStale(t *testing.T) {
 	if add, _ := Diff(nil, open); len(add) != 0 {
 		t.Errorf("add = %+v, want none for a program that is not network-blocked", add)
 	}
+
+	// A program that HAS a rule but is no longer network-blocked must have
+	// its rule removed — this is how an admin un-blocks an app.
+	unblocked := Program{Path: `C:\unblocked.exe`, NetworkBlocked: false}
+	name := RuleName(unblocked.Path)
+	add, remove = Diff([]string{name}, map[string]Program{name: unblocked})
+	if len(add) != 0 {
+		t.Errorf("add = %+v, want none", add)
+	}
+	if len(remove) != 1 || remove[0] != name {
+		t.Errorf("remove = %+v, want the rule for the no-longer-blocked program", remove)
+	}
 }
 
 func TestNoopEnforcerRecordsWithoutTouchingTheHost(t *testing.T) {
