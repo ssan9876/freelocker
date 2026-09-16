@@ -260,3 +260,36 @@ func TestClaimDeliveriesConcurrent(t *testing.T) {
 		}
 	}
 }
+
+// Syslog channels carry their transport and wire format in the URL, so
+// validation is the only thing standing between a typo and a channel that
+// fails silently on every delivery.
+func TestValidateSyslogChannel(t *testing.T) {
+	base := store.NotificationChannel{
+		Kind: "syslog", Name: "SIEM", Events: []string{"alert.raised"}, Enabled: true,
+	}
+	for _, tc := range []struct {
+		url  string
+		ok   bool
+		what string
+	}{
+		{"udp://siem.example.com:514", true, "udp default format"},
+		{"tcp://siem.example.com:514", true, "tcp"},
+		{"tcp://siem.example.com:514?format=cef", true, "cef"},
+		{"udp://siem.example.com:514?format=rfc5424", true, "explicit rfc5424"},
+		{"http://siem.example.com", false, "http is not a syslog transport"},
+		{"udp://", false, "no host"},
+		{"udp://siem.example.com:514?format=xml", false, "unknown format"},
+		{"", false, "empty"},
+	} {
+		c := base
+		c.URL = tc.url
+		err := store.ValidateChannel(c)
+		if tc.ok && err != nil {
+			t.Errorf("%s (%q) = %v, want accepted", tc.what, tc.url, err)
+		}
+		if !tc.ok && err == nil {
+			t.Errorf("%s (%q) was accepted, want rejected", tc.what, tc.url)
+		}
+	}
+}

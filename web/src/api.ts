@@ -257,9 +257,13 @@ export type RingfenceEvent = {
 };
 
 export type NotificationStatus = { smtp_configured: boolean; event_kinds: string[] };
+// Syslog carries its transport (udp/tcp) and wire format (rfc5424/cef) in
+// the channel URL, so it needs no fields of its own.
+export type ChannelKind = "email" | "webhook" | "syslog";
+
 export type NotificationChannel = {
   id: string;
-  kind: "email" | "webhook";
+  kind: ChannelKind;
   name: string;
   events: string[];
   enabled: boolean;

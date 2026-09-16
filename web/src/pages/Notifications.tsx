@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { api, ApiError, NotificationChannel, NotificationDelivery, NotificationStatus } from "../api";
+import { api, ApiError, NotificationChannel, NotificationDelivery, NotificationStatus, ChannelKind } from "../api";
 import { useToast } from "../components/Toast";
 import { fmtDate } from "../components/util";
 
@@ -16,7 +16,7 @@ export function Notifications() {
   const [status, setStatus] = useState<NotificationStatus | null>(null);
   const [channels, setChannels] = useState<NotificationChannel[] | null>(null);
   const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([]);
-  const [kind, setKind] = useState<"webhook" | "email">("webhook");
+  const [kind, setKind] = useState<ChannelKind>("webhook");
   const [name, setName] = useState("");
   const [recipients, setRecipients] = useState("");
   const [url, setUrl] = useState("");
@@ -49,6 +49,8 @@ export function Notifications() {
       if (kind === "webhook") {
         body.url = url;
         if (secret) body.secret = secret;
+      } else if (kind === "syslog") {
+        body.url = url;
       } else {
         body.recipients = recipients.split(",").map((s) => s.trim()).filter(Boolean);
       }
@@ -114,8 +116,9 @@ export function Notifications() {
           <div className="toolbar" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
             <div>
               <label>Kind</label>
-              <select aria-label="Channel kind" value={kind} onChange={(e) => setKind(e.target.value as "webhook" | "email")}>
+              <select aria-label="Channel kind" value={kind} onChange={(e) => setKind(e.target.value as ChannelKind)}>
                 <option value="webhook">Webhook</option>
+                <option value="syslog">Syslog / SIEM</option>
                 <option value="email" disabled={!smtp}>
                   Email{smtp ? "" : " (SMTP not configured)"}
                 </option>
@@ -136,6 +139,21 @@ export function Notifications() {
                   <input aria-label="Webhook secret" type="password" value={secret} onChange={(e) => setSecret(e.target.value)} />
                 </div>
               </>
+            ) : kind === "syslog" ? (
+              <div>
+                <label>Collector URL</label>
+                <input
+                  aria-label="Syslog URL"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="udp://siem.example.com:514"
+                  size={38}
+                />
+                <div className="who" style={{ marginTop: 4, maxWidth: 380 }}>
+                  udp:// or tcp://. RFC 5424 by default; append <span className="mono">?format=cef</span>{" "}
+                  for ArcSight-style CEF. TCP messages are newline-framed.
+                </div>
+              </div>
             ) : (
               <div>
                 <label>Recipients (comma-separated)</label>
@@ -151,7 +169,7 @@ export function Notifications() {
               </label>
             ))}
           </div>
-          <button className="primary" style={{ marginTop: 10 }} disabled={busy || !name || events.length === 0 || (kind === "webhook" ? !url : !recipients)}>
+          <button className="primary" style={{ marginTop: 10 }} disabled={busy || !name || events.length === 0 || (kind === "email" ? !recipients : !url)}>
             Add channel
           </button>
         </form>
@@ -180,7 +198,7 @@ export function Notifications() {
                 <tr key={c.id}>
                   <td>{c.name}</td>
                   <td>{c.kind}</td>
-                  <td className="mono">{c.kind === "webhook" ? c.url + (c.has_secret ? " (signed)" : "") : c.recipients.join(", ")}</td>
+                  <td className="mono">{c.kind === "email" ? c.recipients.join(", ") : c.url + (c.kind === "webhook" && c.has_secret ? " (signed)" : "")}</td>
                   <td>{c.events.map((k) => EVENT_LABELS[k] ?? k).join(", ")}</td>
                   <td>
                     <input type="checkbox" aria-label={`Channel ${c.name} enabled`} checked={c.enabled} onChange={(e) => setEnabled(c, e.target.checked)} />

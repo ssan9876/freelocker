@@ -22,7 +22,7 @@ func (e *ValidationError) Error() string { return e.Msg }
 
 type NotificationChannel struct {
 	ID         uuid.UUID
-	Kind       string // email|webhook
+	Kind       string // email|webhook|syslog
 	Name       string
 	Events     []string
 	Enabled    bool
@@ -55,6 +55,18 @@ func ValidateChannel(c NotificationChannel) error {
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			return &ValidationError{"webhook url must be http or https"}
 		}
+	case "syslog":
+		// Transport and wire format both live in the URL, which keeps syslog
+		// on the existing channel model with no schema change:
+		//   udp://siem:514            (RFC 5424, the default)
+		//   tcp://siem:514?format=cef (CEF, for ArcSight-lineage tools)
+		u, err := url.Parse(c.URL)
+		if err != nil || (u.Scheme != "udp" && u.Scheme != "tcp") || u.Host == "" {
+			return &ValidationError{"syslog url must be udp://host:port or tcp://host:port"}
+		}
+		if f := strings.ToLower(u.Query().Get("format")); f != "" && f != "rfc5424" && f != "cef" {
+			return &ValidationError{"syslog format must be rfc5424 or cef"}
+		}
 	case "email":
 		if len(c.Recipients) == 0 {
 			return &ValidationError{"at least one recipient is required"}
@@ -65,7 +77,7 @@ func ValidateChannel(c NotificationChannel) error {
 			}
 		}
 	default:
-		return &ValidationError{"kind must be email or webhook"}
+		return &ValidationError{"kind must be email, webhook or syslog"}
 	}
 	return nil
 }

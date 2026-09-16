@@ -223,6 +223,8 @@ func (s *Service) send(ctx context.Context, ch store.NotificationChannel, e Even
 			}
 		}
 		return s.postWebhook(ctx, ch.URL, secret, e, deliveryID)
+	case "syslog":
+		return sendSyslog(ctx, ch.URL, e)
 	case "email":
 		if !s.SMTP.Configured() {
 			return permanentError{errNoSMTP}
