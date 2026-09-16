@@ -191,7 +191,7 @@ func (e *WinEnforcer) Violations(_ context.Context) ([]Violation, error) {
 	var out []Violation
 	if raw, err := exec.Command("wevtutil", "qe", "Security",
 		"/q:"+EventQuery([]int{wfpID}, secWM), "/c:500", "/rd:true", "/f:xml").Output(); err == nil {
-		if v, err := ParseWFP(raw, set); err == nil {
+		if v, err := ParseWFP(raw, set, volumeMap()); err == nil {
 			out = append(out, v...)
 		}
 		// The watermark advances past every record in the batch, including

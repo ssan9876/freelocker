@@ -99,15 +99,32 @@ func MaxRecordID(raw []byte) (int64, error) {
 	return max, nil
 }
 
-var devicePath = regexp.MustCompile(`^\\device\\harddiskvolume\d+`)
+var devicePath = regexp.MustCompile(`^\\device\\([^\\]+)`)
 
-// normalisePath turns the \device\harddiskvolumeN\... form that WFP events
-// use into a comparable lower-case path. The volume number cannot be mapped
-// to a drive letter without more work, so the leading segment is dropped and
-// matching is done on the remainder.
-func normalisePath(p string) string {
+// resolveAppPath turns the \device\harddiskvolumeN\... form that WFP events
+// use into a comparable lower-case c:\... path, using a map of NT volume
+// names to drive letters (see volumeMap on Windows).
+//
+// It reports false when the volume cannot be resolved, and the caller drops
+// the event. Dropping is the safe direction: an earlier version discarded
+// the volume segment entirely and compared only the remainder, which let a
+// ringfence on C:\app\app.exe match an unrelated binary at D:\app\app.exe.
+// Reporting no violation is recoverable; blaming the wrong program is not.
+func resolveAppPath(p string, volumes map[string]string) (string, bool) {
 	p = strings.ToLower(strings.TrimSpace(p))
-	return devicePath.ReplaceAllString(p, "")
+	if p == "" {
+		return "", false
+	}
+	m := devicePath.FindStringSubmatch(p)
+	if m == nil {
+		// Already a normal path; some providers report one directly.
+		return p, true
+	}
+	letter, ok := volumes[m[1]]
+	if !ok {
+		return "", false
+	}
+	return letter + p[len(m[0]):], true
 }
 
 // ParseWFP extracts network violations for ringfenced programs only. Keys of
@@ -117,7 +134,7 @@ func normalisePath(p string) string {
 // an unrelated program's connections to a ringfenced entry. Enforced is
 // derived per-event from the EventID: 5157 is a block, 5156 is an
 // audit-mode observation.
-func ParseWFP(raw []byte, ringfenced map[string]bool) ([]Violation, error) {
+func ParseWFP(raw []byte, ringfenced map[string]bool, volumes map[string]string) ([]Violation, error) {
 	evts, err := parseEvents(raw)
 	if err != nil {
 		return nil, err
@@ -127,24 +144,16 @@ func ParseWFP(raw []byte, ringfenced map[string]bool) ([]Violation, error) {
 		if e.EventID != 5156 && e.EventID != 5157 {
 			continue
 		}
-		app := normalisePath(e.field("Application"))
-		matched := ""
-		for want := range ringfenced {
-			tail := normalisePath(want)
-			if i := strings.Index(tail, ":"); i == 1 { // strip "c:"
-				tail = tail[2:]
-			}
-			if app == tail {
-				matched = want
-				break
-			}
+		app, ok := resolveAppPath(e.field("Application"), volumes)
+		if !ok {
+			continue // volume not resolvable: cannot attribute it safely
 		}
-		if matched == "" {
+		if !ringfenced[app] {
 			continue // not ringfenced: drop before it reaches the server
 		}
 		out = append(out, Violation{
 			Kind:     "network",
-			Program:  matched,
+			Program:  app,
 			Detail:   e.field("DestAddress") + ":" + e.field("DestPort"),
 			Enforced: e.EventID == 5157,
 			At:       eventTime(e.TimeCreated.SystemTime),

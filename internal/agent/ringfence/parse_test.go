@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+// testVolumes maps the fixture's device volume to C:, matching a typical
+// single-disk Windows box.
+var testVolumes = map[string]string{"harddiskvolume3": "c:"}
+
 func TestParseWFPKeepsOnlyRingfencedPrograms(t *testing.T) {
 	raw, err := os.ReadFile("testdata/wfp_5156.xml")
 	if err != nil {
@@ -15,7 +19,7 @@ func TestParseWFPKeepsOnlyRingfencedPrograms(t *testing.T) {
 	// Only app.exe is ringfenced; everything else on the box must be dropped
 	// before it ever reaches the server.
 	ringfenced := map[string]bool{`c:\program files\app\app.exe`: true}
-	got, err := ParseWFP(raw, ringfenced)
+	got, err := ParseWFP(raw, ringfenced, testVolumes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +51,7 @@ func TestParseWFPNormalisesDevicePaths(t *testing.T) {
 		`<Data Name="Application">\device\harddiskvolume3\program files\app\app.exe</Data>` +
 		`<Data Name="DestAddress">203.0.113.5</Data><Data Name="DestPort">443</Data>` +
 		`</EventData></Event></Events>`)
-	got, err := ParseWFP(raw, map[string]bool{`c:\program files\app\app.exe`: true})
+	got, err := ParseWFP(raw, map[string]bool{`c:\program files\app\app.exe`: true}, testVolumes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +72,7 @@ func TestParseWFPBlockedConnectionIsEnforced(t *testing.T) {
 		`<Data Name="Application">\device\harddiskvolume3\program files\app\app.exe</Data>` +
 		`<Data Name="DestAddress">203.0.113.5</Data><Data Name="DestPort">443</Data>` +
 		`</EventData></Event></Events>`)
-	got, err := ParseWFP(raw, map[string]bool{`c:\program files\app\app.exe`: true})
+	got, err := ParseWFP(raw, map[string]bool{`c:\program files\app\app.exe`: true}, testVolumes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +92,7 @@ func TestParseWFPRejectsSuffixOnlyMatch(t *testing.T) {
 		`<Data Name="Application">\device\harddiskvolume3\evil\app\app.exe</Data>` +
 		`<Data Name="DestAddress">198.51.100.9</Data><Data Name="DestPort">443</Data>` +
 		`</EventData></Event></Events>`)
-	got, err := ParseWFP(raw, map[string]bool{`c:\app\app.exe`: true})
+	got, err := ParseWFP(raw, map[string]bool{`c:\app\app.exe`: true}, testVolumes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +127,7 @@ func TestParseWFPUsesRealEventTimestamp(t *testing.T) {
 		t.Fatal(err)
 	}
 	ringfenced := map[string]bool{`c:\program files\app\app.exe`: true}
-	got, err := ParseWFP(raw, ringfenced)
+	got, err := ParseWFP(raw, ringfenced, testVolumes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +149,7 @@ func TestParseWFPFallsBackToNowWhenTimestampMissing(t *testing.T) {
 		`<Data Name="Application">\device\harddiskvolume3\program files\app\app.exe</Data>` +
 		`<Data Name="DestAddress">203.0.113.5</Data><Data Name="DestPort">443</Data>` +
 		`</EventData></Event></Events>`)
-	got, err := ParseWFP(raw, map[string]bool{`c:\program files\app\app.exe`: true})
+	got, err := ParseWFP(raw, map[string]bool{`c:\program files\app\app.exe`: true}, testVolumes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,5 +231,65 @@ func TestDedupeCollapsesRepeatsAndCaps(t *testing.T) {
 	}
 	if got := Dedupe(v, 1); len(got) != 1 {
 		t.Errorf("cap ignored: %d", len(got))
+	}
+}
+
+// Two volumes, same relative path. normalisePath used to discard the
+// \device\harddiskvolumeN prefix from the event AND the drive letter from
+// the ringfence entry, comparing only what was left — so a ringfence on
+// C:\app\app.exe silently matched a completely different binary at
+// D:\app\app.exe. That is the same misattribution the suffix-match
+// regression above guards against, reintroduced one level down.
+//
+// Enforcement is unaffected (the firewall rule is scoped to the literal
+// path), but audit mode is exactly where an admin decides whether a program
+// deserves a ringfence, and it must not blame the wrong binary.
+func TestParseWFPDistinguishesVolumes(t *testing.T) {
+	// harddiskvolume3 is C:, harddiskvolume5 is D:.
+	volumes := map[string]string{"harddiskvolume3": "c:", "harddiskvolume5": "d:"}
+
+	event := func(vol string) []byte {
+		return []byte(`<Events><Event><System><EventID>5156</EventID></System><EventData>` +
+			`<Data Name="Application">\device\` + vol + `\app\app.exe</Data>` +
+			`<Data Name="DestAddress">203.0.113.5</Data><Data Name="DestPort">443</Data>` +
+			`</EventData></Event></Events>`)
+	}
+	ringfenced := map[string]bool{`c:\app\app.exe`: true}
+
+	// The ringfenced binary on C: still matches.
+	got, err := ParseWFP(event("harddiskvolume3"), ringfenced, volumes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("C:\app\app.exe gave %d violations, want 1", len(got))
+	}
+
+	// A different binary at the same relative path on D: must not be
+	// attributed to the C: ringfence entry.
+	got, err = ParseWFP(event("harddiskvolume5"), ringfenced, volumes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("D:\app\app.exe gave %d violations, want 0 — a different volume was misattributed to the C: ringfence: %+v", len(got), got)
+	}
+}
+
+// An unmappable volume is dropped rather than guessed at. Reporting the
+// wrong program is worse than reporting nothing, and enforcement does not
+// depend on this path.
+func TestParseWFPDropsUnresolvableVolume(t *testing.T) {
+	raw := []byte(`<Events><Event><System><EventID>5156</EventID></System><EventData>` +
+		`<Data Name="Application">\device\harddiskvolume9\app\app.exe</Data>` +
+		`<Data Name="DestAddress">203.0.113.5</Data><Data Name="DestPort">443</Data>` +
+		`</EventData></Event></Events>`)
+	got, err := ParseWFP(raw, map[string]bool{`c:\app\app.exe`: true},
+		map[string]string{"harddiskvolume3": "c:"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("got %d violations, want 0 for an unmappable volume: %+v", len(got), got)
 	}
 }
