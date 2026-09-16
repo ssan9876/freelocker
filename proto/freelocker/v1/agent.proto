@@ -65,6 +65,15 @@ message ObservedApp {
   string signer = 3;
   string signer_tbs = 4;      // signing certificate TBS hash, "" when unsigned
   bool signer_verified = 5;   // Windows verified the signature
+  // Mark-of-the-Web provenance. A hint, not a security boundary: a user can
+  // strip the mark from a file they own, so true is meaningful and false is
+  // unproven.
+  //
+  // optional so presence is explicit: an agent too old to look reports
+  // nothing, which is a different fact from an agent that looked and found
+  // no mark. A plain bool would collapse the two into "not downloaded".
+  optional bool downloaded = 6;
+  string download_source = 7; // origin URL from the mark, "" when absent
 }
 
 message ObserveRequest {

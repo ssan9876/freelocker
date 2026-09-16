@@ -49,6 +49,10 @@ func (s *agentService) Observe(ctx context.Context, req *flv1.ObserveRequest) (*
 		err := s.d.Store.RecordObservation(ctx, dev.TenantID, dev.ID, store.Observation{
 			SHA256: a.GetSha256(), Path: a.GetPath(), Signer: a.GetSigner(),
 			SignerTBS: a.GetSignerTbs(), SignerVerified: a.GetSignerVerified(),
+			// Carried through as a pointer: nil means the agent never
+			// reported provenance, which the store keeps distinct from a
+			// reported false.
+			Downloaded: a.Downloaded, DownloadSource: a.GetDownloadSource(),
 		}, now)
 		if err != nil {
 			s.d.Log.Error("record observation", "device", dev.ID, "err", err)

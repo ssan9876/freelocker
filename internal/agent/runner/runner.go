@@ -374,8 +374,12 @@ func (r *Runner) reportObservations(ctx context.Context, client flv1.AgentClient
 	}
 	apps := make([]*flv1.ObservedApp, 0, len(obs))
 	for _, o := range obs {
+		downloaded := o.Downloaded
 		apps = append(apps, &flv1.ObservedApp{Sha256: o.SHA256, Path: o.Path, Signer: o.Signer,
-			SignerTbs: o.SignerTBS, SignerVerified: o.SignerVerified})
+			SignerTbs: o.SignerTBS, SignerVerified: o.SignerVerified,
+			// Always set, so this agent's "no mark" is distinguishable from
+			// an older agent's silence.
+			Downloaded: &downloaded, DownloadSource: o.DownloadSource})
 	}
 	if _, err := client.Observe(ctx, &flv1.ObserveRequest{Apps: apps}); err != nil {
 		r.log().Warn("report observations", "err", err)

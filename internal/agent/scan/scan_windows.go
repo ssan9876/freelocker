@@ -5,6 +5,7 @@ package scan
 import (
 	"unsafe"
 
+	"freelocker/internal/agent/motw"
 	"freelocker/internal/appcontrol/signature"
 
 	"golang.org/x/sys/windows"
@@ -37,6 +38,11 @@ func runningImpl() ([]Observed, error) {
 					o := Observed{SHA256: sum, Path: path}
 					if info, err := signature.FromFile(path); err == nil {
 						o.Signer, o.SignerTBS, o.SignerVerified = info.SubjectName, info.TBSHash, info.Verified
+					}
+					// Provenance is best-effort: a file we cannot read the
+					// mark for is still a real observation.
+					if m, err := motw.Read(path); err == nil {
+						o.Downloaded, o.DownloadSource = m.Downloaded(), m.Source()
 					}
 					out = append(out, o)
 				}

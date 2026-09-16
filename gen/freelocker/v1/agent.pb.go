@@ -487,6 +487,15 @@ type ObservedApp struct {
 	Signer         string                 `protobuf:"bytes,3,opt,name=signer,proto3" json:"signer,omitempty"`
 	SignerTbs      string                 `protobuf:"bytes,4,opt,name=signer_tbs,json=signerTbs,proto3" json:"signer_tbs,omitempty"`                 // signing certificate TBS hash, "" when unsigned
 	SignerVerified bool                   `protobuf:"varint,5,opt,name=signer_verified,json=signerVerified,proto3" json:"signer_verified,omitempty"` // Windows verified the signature
+	// Mark-of-the-Web provenance. A hint, not a security boundary: a user can
+	// strip the mark from a file they own, so true is meaningful and false is
+	// unproven.
+	//
+	// optional so presence is explicit: an agent too old to look reports
+	// nothing, which is a different fact from an agent that looked and found
+	// no mark. A plain bool would collapse the two into "not downloaded".
+	Downloaded     *bool  `protobuf:"varint,6,opt,name=downloaded,proto3,oneof" json:"downloaded,omitempty"`
+	DownloadSource string `protobuf:"bytes,7,opt,name=download_source,json=downloadSource,proto3" json:"download_source,omitempty"` // origin URL from the mark, "" when absent
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -554,6 +563,20 @@ func (x *ObservedApp) GetSignerVerified() bool {
 		return x.SignerVerified
 	}
 	return false
+}
+
+func (x *ObservedApp) GetDownloaded() bool {
+	if x != nil && x.Downloaded != nil {
+		return *x.Downloaded
+	}
+	return false
+}
+
+func (x *ObservedApp) GetDownloadSource() string {
+	if x != nil {
+		return x.DownloadSource
+	}
+	return ""
 }
 
 type ObserveRequest struct {
@@ -1946,14 +1969,19 @@ const file_freelocker_v1_agent_proto_rawDesc = "" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x12\n" +
 	"\x04mode\x18\x02 \x01(\tR\x04mode\x12\x10\n" +
 	"\x03xml\x18\x03 \x01(\fR\x03xml\x12\x1c\n" +
-	"\tsignature\x18\x04 \x01(\fR\tsignature\"\x99\x01\n" +
+	"\tsignature\x18\x04 \x01(\fR\tsignature\"\xf6\x01\n" +
 	"\vObservedApp\x12\x16\n" +
 	"\x06sha256\x18\x01 \x01(\tR\x06sha256\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x16\n" +
 	"\x06signer\x18\x03 \x01(\tR\x06signer\x12\x1d\n" +
 	"\n" +
 	"signer_tbs\x18\x04 \x01(\tR\tsignerTbs\x12'\n" +
-	"\x0fsigner_verified\x18\x05 \x01(\bR\x0esignerVerified\"@\n" +
+	"\x0fsigner_verified\x18\x05 \x01(\bR\x0esignerVerified\x12#\n" +
+	"\n" +
+	"downloaded\x18\x06 \x01(\bH\x00R\n" +
+	"downloaded\x88\x01\x01\x12'\n" +
+	"\x0fdownload_source\x18\a \x01(\tR\x0edownloadSourceB\r\n" +
+	"\v_downloaded\"@\n" +
 	"\x0eObserveRequest\x12.\n" +
 	"\x04apps\x18\x01 \x03(\v2\x1a.freelocker.v1.ObservedAppR\x04apps\"\xcb\x01\n" +
 	"\n" +
@@ -2163,6 +2191,7 @@ func file_freelocker_v1_agent_proto_init() {
 	if File_freelocker_v1_agent_proto != nil {
 		return
 	}
+	file_freelocker_v1_agent_proto_msgTypes[8].OneofWrappers = []any{}
 	file_freelocker_v1_agent_proto_msgTypes[19].OneofWrappers = []any{
 		(*AgentMessage_Heartbeat)(nil),
 		(*AgentMessage_CommandResult)(nil),

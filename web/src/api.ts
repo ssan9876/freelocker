@@ -164,6 +164,10 @@ export type PolicyRule = {
   description: string;
 };
 export type PolicyDetail = { policy: Policy; rules: PolicyRule[]; version: string };
+// downloaded is null when no agent has reported Mark-of-the-Web provenance
+// for this binary — an older agent reports nothing, and that is a different
+// fact from an agent that looked and found no mark. Never render null as
+// "not downloaded".
 export type Observation = {
   sha256: string;
   path: string;
@@ -173,6 +177,8 @@ export type Observation = {
   count: number;
   first_seen: string;
   last_seen: string;
+  downloaded: boolean | null;
+  download_source: string;
 };
 export type MetricSample = { at: string; cpu_pct: number; mem_pct: number; disk_pct: number };
 export type AlertRule = {

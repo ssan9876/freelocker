@@ -463,6 +463,7 @@ export function DeviceDetail() {
                 <thead>
                   <tr>
                     <th>Path</th>
+                    <th>Origin</th>
                     <th>Publisher</th>
                     <th>SHA-256</th>
                     <th>Count</th>
@@ -473,6 +474,28 @@ export function DeviceDetail() {
                   {obs.map((o) => (
                     <tr key={o.sha256 + o.path}>
                       <td className="mono">{o.path}</td>
+                      <td>
+                        {o.downloaded === null ? (
+                          <span className="who" title="No agent has reported provenance for this binary">
+                            Unknown
+                          </span>
+                        ) : o.downloaded ? (
+                          <span
+                            className="badge fail"
+                            title={
+                              o.download_source
+                                ? `Mark-of-the-Web: ${o.download_source}`
+                                : "Carries a Mark-of-the-Web from outside this machine"
+                            }
+                          >
+                            Downloaded
+                          </span>
+                        ) : (
+                          <span className="badge ok" title="No Mark-of-the-Web — installed rather than fetched">
+                            Installed
+                          </span>
+                        )}
+                      </td>
                       <td>
                         {o.signer_verified ? (
                           o.signer || "Signed"

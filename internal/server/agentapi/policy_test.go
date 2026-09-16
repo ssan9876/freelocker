@@ -87,6 +87,37 @@ func TestGetPolicyObserveAndReportBlocks(t *testing.T) {
 	if len(obs) != 1 || obs[0].SHA256 != "AA" {
 		t.Fatalf("observations = %+v", obs)
 	}
+	// An agent that sends no provenance field at all leaves it unknown, not
+	// false — this is the wire behaviour that lets an older agent coexist
+	// with the console's "unknown" state.
+	if obs[0].Downloaded != nil {
+		t.Errorf("absent provenance became %v, want nil", *obs[0].Downloaded)
+	}
+
+	// A newer agent reports the mark, and it survives the round trip.
+	yes := true
+	if _, err := client.Observe(ctx, &flv1.ObserveRequest{Apps: []*flv1.ObservedApp{
+		{Sha256: "CC", Path: `C:\Users\u\Downloads\setup.exe`, Downloaded: &yes,
+			DownloadSource: "https://example.com/setup.exe"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	obs, _ = ts.Deps.Store.ListObservations(ctx, tenant, devID, 10)
+	var downloaded *store.Observation
+	for i := range obs {
+		if obs[i].SHA256 == "CC" {
+			downloaded = &obs[i]
+		}
+	}
+	if downloaded == nil {
+		t.Fatalf("downloaded observation missing from %+v", obs)
+	}
+	if downloaded.Downloaded == nil || !*downloaded.Downloaded {
+		t.Errorf("provenance = %v, want true over the wire", downloaded.Downloaded)
+	}
+	if downloaded.DownloadSource != "https://example.com/setup.exe" {
+		t.Errorf("source = %q", downloaded.DownloadSource)
+	}
 
 	if _, err := client.ReportBlocks(ctx, &flv1.ReportBlocksRequest{Events: []*flv1.BlockEvent{
 		{Sha256: "BB", Path: `C:\bad.exe`, Blocked: false, AtUnix: time.Now().Unix()},

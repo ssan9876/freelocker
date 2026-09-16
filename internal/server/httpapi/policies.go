@@ -246,6 +246,9 @@ func (a *API) listObservations(w http.ResponseWriter, r *http.Request) {
 			"sha256": o.SHA256, "path": o.Path, "signer": o.Signer,
 			"signer_tbs": o.SignerTBS, "signer_verified": o.SignerVerified,
 			"count": o.Count, "first_seen": o.FirstSeen, "last_seen": o.LastSeen,
+			// null when no agent has reported provenance, which the console
+			// renders as "unknown" rather than claiming the file is local.
+			"downloaded": o.Downloaded, "download_source": o.DownloadSource,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)

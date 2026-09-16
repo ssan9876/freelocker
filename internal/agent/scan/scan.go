@@ -19,6 +19,14 @@ type Observed struct {
 	Signer         string // friendly publisher name
 	SignerTBS      string // signing certificate TBS hash, "" when unsigned
 	SignerVerified bool   // Windows verified the signature
+
+	// Downloaded reports a Mark-of-the-Web from outside the machine's trust
+	// boundary. It is a provenance hint, not a security boundary: a user can
+	// strip the mark from a file they own, so its presence is meaningful and
+	// its absence is unproven.
+	Downloaded bool
+	// DownloadSource is the origin URL the mark carried, when it carried one.
+	DownloadSource string
 }
 
 // HashFile returns the upper-case hex SHA-256 of a file's contents.
