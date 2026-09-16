@@ -110,7 +110,10 @@ input:focus, select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
-button {
+/* a.button lets a download link (the CSV exports) sit beside real buttons
+   without looking foreign; an anchor is used there so the browser handles
+   the file save itself. */
+button, a.button {
   font: inherit;
   cursor: pointer;
   border: 1px solid var(--border);
@@ -120,12 +123,13 @@ button {
   border-radius: var(--radius);
   font-weight: 500;
 }
-button:hover { background: var(--surface-2); }
+button:hover, a.button:hover { background: var(--surface-2); }
 button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 button.primary:hover { filter: brightness(1.08); }
 button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); border-color: var(--accent); }
 button.danger { background: var(--danger); color: var(--danger-ink); border-color: var(--danger); }
-button.ghost { background: transparent; }
+button.ghost, a.button.ghost { background: transparent; }
+a.button { display: inline-block; text-decoration: none; color: var(--ink); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
 .err { color: var(--danger); margin: 12px 0 0; font-size: 13px; }

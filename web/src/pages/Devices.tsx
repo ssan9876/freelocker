@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, Device, Group } from "../api";
+import { ExportButton } from "../components/ExportButton";
 import { StatusDot } from "../components/StatusDot";
 import { timeAgo } from "../components/util";
 
@@ -34,6 +35,7 @@ export function Devices() {
     <div>
       <div className="page-head">
         <h1>Devices</h1>
+        <ExportButton resource="devices" />
       </div>
       <div className="toolbar">
         <label style={{ margin: 0 }}>Status</label>

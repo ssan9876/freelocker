@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, Audit as Entry } from "../api";
+import { ExportButton } from "../components/ExportButton";
 import { fmtDate } from "../components/util";
 
 export function Audit() {
@@ -28,6 +29,7 @@ export function Audit() {
     <div>
       <div className="page-head">
         <h1>Audit log</h1>
+        <ExportButton resource="audit" />
       </div>
       <div className="table-wrap">
         <table>

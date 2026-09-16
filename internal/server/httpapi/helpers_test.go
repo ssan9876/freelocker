@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -182,4 +183,26 @@ func (e *env) initialized(t *testing.T) *client {
 	}
 	c.loginFull(ownerEmail, ownerPass, "")
 	return c
+}
+
+// raw sends a GET and returns the status, the response body as text, and the
+// response headers. Needed for endpoints that do not return JSON — CSV
+// exports assert on Content-Type and Content-Disposition as much as on the
+// body.
+func (c *client) raw(method, path string) (int, string, http.Header) {
+	c.t.Helper()
+	req, _ := http.NewRequest(method, c.base+path, nil)
+	if c.csrf != "" {
+		req.Header.Set("X-CSRF-Token", c.csrf)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.t.Fatal(err)
+	}
+	return resp.StatusCode, string(b), resp.Header
 }

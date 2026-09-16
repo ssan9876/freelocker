@@ -40,6 +40,7 @@ func (a *API) routes(r chi.Router) {
 	r.Get("/api/ringfences", a.listRingfences)
 	r.Get("/api/ringfences/{id}", a.getRingfence)
 	r.Get("/api/ringfence-events", a.listRingfenceEvents)
+	r.Get("/api/exports/{resource}", a.exportCSV)
 
 	r.Group(func(r chi.Router) {
 		r.Use(a.requireRole("admin"))

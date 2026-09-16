@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, BlockEvent } from "../api";
+import { ExportButton } from "../components/ExportButton";
 import { fmtDate } from "../components/util";
 
 export function Blocks() {
@@ -16,6 +17,7 @@ export function Blocks() {
     <div>
       <div className="page-head">
         <h1>Blocked programs</h1>
+        <ExportButton resource="blocks" />
       </div>
       <p className="who" style={{ marginTop: -8, marginBottom: 14 }}>
         Programs a policy blocked, or — in audit mode — would have blocked.
