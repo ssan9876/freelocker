@@ -106,11 +106,19 @@ func (e *WinEnforcer) applyASR(r Ringfence) error {
 	for _, p := range r.Protections {
 		want[strings.ToUpper(p.ASRRule)] = p.Action
 	}
-	// Remove values we previously set that are no longer wanted.
-	if names, err := k.ReadValueNames(0); err == nil {
-		for _, n := range names {
-			if _, ok := want[strings.ToUpper(n)]; !ok {
-				k.DeleteValue(n)
+	// Remove values we previously set that are no longer wanted. Errors here
+	// are not ignored: a value that fails to delete (or a names list that
+	// fails to read) leaves a stale ASR policy enforcing on the endpoint
+	// after the ringfence is unassigned, silently breaking the reversibility
+	// guarantee.
+	names, err := k.ReadValueNames(0)
+	if err != nil {
+		return fmt.Errorf("read ASR policy values: %w", err)
+	}
+	for _, n := range names {
+		if _, ok := want[strings.ToUpper(n)]; !ok {
+			if err := k.DeleteValue(n); err != nil {
+				return fmt.Errorf("remove stale ASR %s: %w", n, err)
 			}
 		}
 	}
