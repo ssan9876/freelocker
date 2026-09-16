@@ -158,11 +158,21 @@ func (s *Store) ListRingfenceProtections(ctx context.Context, tenantID, ringfenc
 }
 
 func (s *Store) AssignRingfence(ctx context.Context, tenantID, groupID, ringfenceID uuid.UUID) error {
-	_, err := s.pool.Exec(ctx, `
-		INSERT INTO ringfence_assignments (tenant_id, group_id, ringfence_id) VALUES ($1,$2,$3)
-		ON CONFLICT (group_id) DO UPDATE SET ringfence_id=EXCLUDED.ringfence_id`,
+	tag, err := s.pool.Exec(ctx, `
+		INSERT INTO ringfence_assignments (tenant_id, group_id, ringfence_id)
+		SELECT $1, $2, $3
+		WHERE EXISTS (SELECT 1 FROM device_groups WHERE tenant_id=$1 AND id=$2)
+		  AND EXISTS (SELECT 1 FROM ringfence_policies WHERE tenant_id=$1 AND id=$3)
+		ON CONFLICT (group_id) DO UPDATE SET ringfence_id=EXCLUDED.ringfence_id
+		  WHERE ringfence_assignments.tenant_id = $1`,
 		tenantID, groupID, ringfenceID)
-	return conflict(err)
+	if err != nil {
+		return conflict(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) UnassignRingfence(ctx context.Context, tenantID, groupID uuid.UUID) error {
@@ -179,7 +189,7 @@ func (s *Store) RingfenceForDevice(ctx context.Context, tenantID, deviceID uuid.
 	err := s.pool.QueryRow(ctx, `
 		SELECT rp.id, rp.mode FROM devices d
 		JOIN ringfence_assignments ra ON ra.group_id = d.group_id AND ra.tenant_id = d.tenant_id
-		JOIN ringfence_policies rp ON rp.id = ra.ringfence_id
+		JOIN ringfence_policies rp ON rp.id = ra.ringfence_id AND rp.tenant_id = $1
 		WHERE d.tenant_id=$1 AND d.id=$2`, tenantID, deviceID).Scan(&rfID, &out.Mode)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ResolvedRingfence{}, ErrNotFound

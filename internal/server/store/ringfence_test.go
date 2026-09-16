@@ -131,4 +131,36 @@ func TestRingfenceForDevice(t *testing.T) {
 	if _, err := s.RingfenceForDevice(ctx, tenant, dev); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("after unassign err = %v, want ErrNotFound", err)
 	}
+
+	// Cross-tenant security: Tenant B cannot hijack Tenant A's group with its own ringfence.
+	tenantB, _ := s.CreateTenant(ctx, "Beta")
+	groupB, _ := s.CreateDeviceGroup(ctx, tenantB, "BG")
+	rfB := store.Ringfence{ID: uuid.New(), Name: "Beta RF", Mode: "enforce"}
+	if err := s.CreateRingfence(ctx, tenantB, rfB); err != nil {
+		t.Fatal(err)
+	}
+
+	// Re-assign A's group to A's ringfence for the cross-tenant test.
+	if err := s.AssignRingfence(ctx, tenant, group, rf.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// B tries to assign its ringfence to A's group — must be rejected.
+	if err := s.AssignRingfence(ctx, tenantB, group, rfB.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("B.AssignRingfence(B, GA, RB) err = %v, want ErrNotFound", err)
+	}
+
+	// Verify A's assignment is still pointing at RA (not overwritten by B's attempt).
+	checkA, err := s.RingfenceForDevice(ctx, tenant, dev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checkA.Mode != "enforce" {
+		t.Errorf("after B's attempt, A's ringfence corrupted; Mode = %q, want enforce", checkA.Mode)
+	}
+
+	// B tries to assign A's ringfence to B's group — must also be rejected.
+	if err := s.AssignRingfence(ctx, tenantB, groupB, rf.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("B.AssignRingfence(B, GB, RA) err = %v, want ErrNotFound", err)
+	}
 }
