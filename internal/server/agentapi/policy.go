@@ -153,6 +153,49 @@ func (s *agentService) ReportEvents(ctx context.Context, req *flv1.EventsRequest
 	return &flv1.Ack{}, nil
 }
 
+func (s *agentService) GetRingfence(ctx context.Context, _ *flv1.GetRingfenceRequest) (*flv1.GetRingfenceResponse, error) {
+	dev := deviceFrom(ctx)
+	rf, err := s.d.Store.RingfenceForDevice(ctx, dev.TenantID, dev.ID)
+	if err == store.ErrNotFound {
+		return &flv1.GetRingfenceResponse{}, nil // nothing assigned; agent clears any rules it set
+	}
+	if err != nil {
+		s.d.Log.Error("resolve ringfence", "device", dev.ID, "err", err)
+		return nil, status.Error(codes.Internal, "could not resolve ringfence")
+	}
+	out := &flv1.GetRingfenceResponse{Version: rf.Version, Mode: rf.Mode}
+	for _, p := range rf.Programs {
+		out.Programs = append(out.Programs, &flv1.RingfenceProgram{Path: p.Path, NetworkBlocked: p.NetworkBlocked})
+	}
+	for _, p := range rf.Protections {
+		out.Protections = append(out.Protections, &flv1.RingfenceProtection{AsrRule: p.ASRRule, Action: p.Action})
+	}
+	return out, nil
+}
+
+func (s *agentService) ReportRingfenceEvents(ctx context.Context, req *flv1.ReportRingfenceEventsRequest) (*flv1.Ack, error) {
+	dev := deviceFrom(ctx)
+	evs := make([]store.RingfenceEvent, 0, len(req.GetEvents()))
+	for _, e := range req.GetEvents() {
+		if e.GetKind() != "network" && e.GetKind() != "child_process" {
+			continue // ignore unknown kinds rather than failing the batch
+		}
+		at := time.Unix(e.GetAtUnix(), 0)
+		if e.GetAtUnix() == 0 {
+			at = time.Now()
+		}
+		evs = append(evs, store.RingfenceEvent{
+			Kind: e.GetKind(), Program: e.GetProgram(), Detail: e.GetDetail(),
+			Enforced: e.GetEnforced(), At: at,
+		})
+	}
+	if err := s.d.Store.AppendRingfenceEvents(ctx, dev.TenantID, dev.ID, evs); err != nil {
+		s.d.Log.Error("append ringfence events", "device", dev.ID, "err", err)
+		return nil, status.Error(codes.Internal, "could not record events")
+	}
+	return &flv1.Ack{}, nil
+}
+
 func (s *agentService) ReportMetrics(ctx context.Context, req *flv1.MetricsRequest) (*flv1.Ack, error) {
 	dev := deviceFrom(ctx)
 	now := s.d.Now()
