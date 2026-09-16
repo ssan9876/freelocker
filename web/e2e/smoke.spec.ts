@@ -132,9 +132,8 @@ test("first-run setup, sign in with MFA, manage groups, rules and admins", async
   await expect(page.getByText("No channels yet.")).toBeVisible();
 
   // Ringfences: create, confirm it starts in audit, add a program, set one
-  // ASR protection to audit, switch to enforce via the confirmation dialog.
-  // The console has no delete control for a ringfence itself (only for its
-  // programs), so this flow does not attempt a delete.
+  // ASR protection to audit, switch to enforce via the confirmation dialog,
+  // then delete it and confirm it is gone from the list.
   await page.getByRole("link", { name: "Ringfences" }).click();
   await expect(page.getByRole("heading", { name: "Ringfences" })).toBeVisible();
   await page.getByLabel("Ringfence name").fill("Office apps");
@@ -158,4 +157,12 @@ test("first-run setup, sign in with MFA, manage groups, rules and admins", async
   await expect(page.getByRole("heading", { name: "Switch to enforce?" })).toBeVisible();
   await page.getByRole("button", { name: "Switch to enforce" }).click();
   await expect(page.getByLabel("Ringfence mode")).toHaveValue("enforce");
+
+  // Delete it: the confirmation dialog names what will be lost, and deleting
+  // navigates back to the list where the ringfence is gone.
+  await page.getByRole("button", { name: "Delete ringfence" }).click();
+  await expect(page.getByRole("heading", { name: "Delete ringfence" })).toBeVisible();
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Ringfences" })).toBeVisible();
+  await expect(page.getByText("Office apps", { exact: true })).toHaveCount(0);
 });

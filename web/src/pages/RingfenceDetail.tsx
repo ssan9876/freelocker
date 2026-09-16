@@ -29,7 +29,9 @@ export function RingfenceDetail() {
   const [note, setNote] = useState("");
   const [assignGroup, setAssignGroup] = useState("");
   const [confirmEnforce, setConfirmEnforce] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const load = () =>
     api
@@ -131,6 +133,19 @@ export function RingfenceDetail() {
     }
   };
 
+  const deleteRingfence = async () => {
+    setDeleteBusy(true);
+    try {
+      await api.del(`/api/ringfences/${id}`);
+      notify("Ringfence deleted");
+      nav("/ringfences");
+    } catch (e) {
+      notify(e instanceof ApiError ? e.message : "Could not delete ringfence", "error");
+      setDeleteBusy(false);
+      setConfirmDelete(false);
+    }
+  };
+
   if (!detail) return <div className="spin">Loading…</div>;
   const mode = detail.ringfence.mode;
   const protectionFor = (ruleId: string) => detail.protections.find((p) => p.asr_rule === ruleId)?.action ?? "off";
@@ -144,7 +159,12 @@ export function RingfenceDetail() {
           </a>{" "}
           / {detail.ringfence.name}
         </h1>
-        <span className={`badge ${mode === "enforce" ? "fail" : "role"}`}>{mode}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span className={`badge ${mode === "enforce" ? "fail" : "role"}`}>{mode}</span>
+          <button className="ghost" aria-label="Delete ringfence" onClick={() => setConfirmDelete(true)}>
+            Delete ringfence
+          </button>
+        </div>
       </div>
 
       <div className="detail-grid">
@@ -322,6 +342,22 @@ export function RingfenceDetail() {
           <p>
             Devices with this ringfence assigned will start blocking network access and applying the ASR
             rules set to <b>Block</b>. Review the audit events first if you have not already.
+          </p>
+        </Confirm>
+      )}
+
+      {confirmDelete && (
+        <Confirm
+          title={`Delete ringfence “${detail.ringfence.name}”?`}
+          confirmLabel="Delete"
+          danger
+          busy={deleteBusy}
+          onConfirm={deleteRingfence}
+          onCancel={() => setConfirmDelete(false)}
+        >
+          <p>
+            This unassigns it from every group and permanently deletes its programs and protections. This
+            cannot be undone.
           </p>
         </Confirm>
       )}
