@@ -130,4 +130,32 @@ test("first-run setup, sign in with MFA, manage groups, rules and admins", async
   await expect(page.getByLabel("Channel Dead hook enabled")).not.toBeChecked();
   await page.getByLabel("Delete Dead hook").click();
   await expect(page.getByText("No channels yet.")).toBeVisible();
+
+  // Ringfences: create, confirm it starts in audit, add a program, set one
+  // ASR protection to audit, switch to enforce via the confirmation dialog.
+  // The console has no delete control for a ringfence itself (only for its
+  // programs), so this flow does not attempt a delete.
+  await page.getByRole("link", { name: "Ringfences" }).click();
+  await expect(page.getByRole("heading", { name: "Ringfences" })).toBeVisible();
+  await page.getByLabel("Ringfence name").fill("Office apps");
+  await page.getByRole("button", { name: "Create ringfence" }).click();
+  // The ringfence name in the list is a plain <a onClick> with no href, so
+  // it has no accessible "link" role — select it by its exact text instead.
+  await page.getByText("Office apps", { exact: true }).click();
+  // A new ringfence must start in audit mode.
+  await expect(page.getByLabel("Ringfence mode")).toHaveValue("audit");
+
+  await page.getByLabel("Program path").fill("C:\\Program Files\\App\\app.exe");
+  await page.getByRole("button", { name: "Add program" }).click();
+  await expect(page.getByRole("cell", { name: "C:\\Program Files\\App\\app.exe" })).toBeVisible();
+
+  await page.getByLabel("Office applications creating child processes").selectOption("audit");
+  await expect(page.getByLabel("Office applications creating child processes")).toHaveValue("audit");
+
+  // Switching to enforce opens a confirmation dialog; the select itself does
+  // not change mode until the dialog's button is clicked.
+  await page.getByLabel("Ringfence mode").selectOption("enforce");
+  await expect(page.getByRole("heading", { name: "Switch to enforce?" })).toBeVisible();
+  await page.getByRole("button", { name: "Switch to enforce" }).click();
+  await expect(page.getByLabel("Ringfence mode")).toHaveValue("enforce");
 });

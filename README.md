@@ -16,6 +16,7 @@ Server (freelocker-server, one binary)
 Agent (freelocker-agent, Windows service, SYSTEM)
   enroll · heartbeat/inventory · signed commands · cert auto-renew
   WDAC application control · learning · block reporting
+  ringfencing (per-program network/child-process containment)
   resource metrics · USB storage control · self-update (staged rollouts with pause/rollback) · self-protection
 Console (React SPA, embedded in the server)
   setup · login + TOTP · devices · policies · blocked programs · alerts
@@ -61,10 +62,28 @@ provider tenant-management API (create, rename, and reversibly suspend a
 tenant), and a provider console view — see
 `docs/superpowers/specs/2026-09-11-msp-multitenancy-design.md`.
 
+**Ringfencing** constrains what an allowed application may do, independent of
+whether it's allowed to run at all: per-program network blocking (enforced
+with Windows Firewall rules) and Office/scripting child-process containment
+(enforced through Windows Defender's six curated Attack Surface Reduction
+rules, reported alongside whether Defender is even active on the device). A
+ringfence starts in audit mode and is switched to enforce only behind a
+confirmation dialog. Network and child-process containment are **built and
+tested — the data model, protocol, agent diffing, parsers, firewall/ASR
+enforcer, HTTP API and console are all covered by Go tests and a Playwright
+console flow — but enforcement itself is not yet verified on a VM**; the Go
+test suite proves the model, the API and the parsers behave correctly, not
+that Windows Firewall or Defender ASR actually contain anything on a real
+machine. See `docs/ringfence-manual-test.md` for the checklist that would
+verify it. File and registry containment for ringfenced programs are not
+implemented — they remain part of sub-project 5 (the kernel driver).
+
 Anything that could lock or destabilize a real machine (WDAC enforcement,
-USB blocking, service install) **defaults to safe/audit mode and is
-verified only on a disposable VM** — never against the dev machine. See the
-`docs/*-manual-test.md` checklists.
+USB blocking, service install, ringfence enforcement) **defaults to
+safe/audit mode**, and live enforcement is **verified only on a disposable
+VM** — never against the dev machine — for every capability except
+ringfencing, where that VM verification is still outstanding (see above).
+See the `docs/*-manual-test.md` checklists.
 
 ## Run it locally
 
