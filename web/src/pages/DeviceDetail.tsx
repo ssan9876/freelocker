@@ -449,7 +449,7 @@ export function DeviceDetail() {
           <>
             <div className="toolbar">
               <label style={{ margin: 0 }}>Add to policy</label>
-              <select value={promoteTo} onChange={(e) => setPromoteTo(e.target.value)}>
+              <select aria-label="Add to policy" value={promoteTo} onChange={(e) => setPromoteTo(e.target.value)}>
                 <option value="">Choose policy…</option>
                 {policies.map((p) => (
                   <option key={p.id} value={p.id}>

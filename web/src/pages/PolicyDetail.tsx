@@ -73,7 +73,11 @@ export function PolicyDetail() {
           <div className="toolbar" style={{ alignItems: "flex-end" }}>
             <div>
               <label>Kind</label>
-              <select value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
+              <select
+                aria-label="Rule kind"
+                value={kind}
+                onChange={(e) => setKind(e.target.value as typeof kind)}
+              >
                 <option value="hash">File hash</option>
                 <option value="publisher">Publisher</option>
                 <option value="path">Path</option>
@@ -81,17 +85,32 @@ export function PolicyDetail() {
             </div>
             <div style={{ flex: 1, minWidth: 260 }}>
               <label>Value</label>
-              <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={placeholder} />
+              <input
+                aria-label="Rule value"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder={placeholder}
+              />
             </div>
             {kind === "publisher" && (
               <div>
                 <label>Publisher name</label>
-                <input value={publisher} onChange={(e) => setPublisher(e.target.value)} placeholder="Acme Corp" />
+                <input
+                  aria-label="Publisher name"
+                  value={publisher}
+                  onChange={(e) => setPublisher(e.target.value)}
+                  placeholder="Acme Corp"
+                />
               </div>
             )}
             <div>
               <label>Description</label>
-              <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="optional" />
+              <input
+                aria-label="Rule description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="optional"
+              />
             </div>
             <button className="primary" disabled={!value}>
               Add rule

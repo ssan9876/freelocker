@@ -43,7 +43,11 @@ export function Approvals() {
     <div>
       <div className="page-head">
         <h1>Approvals</h1>
-        <select value={status} onChange={(e) => setStatus(e.target.value as ApprovalStatus)}>
+        <select
+          aria-label="Approval status filter"
+          value={status}
+          onChange={(e) => setStatus(e.target.value as ApprovalStatus)}
+        >
           <option value="pending">Pending</option>
           <option value="approved">Approved</option>
           <option value="denied">Denied</option>

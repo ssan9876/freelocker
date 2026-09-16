@@ -60,11 +60,16 @@ export function Tokens() {
           <div className="toolbar" style={{ alignItems: "flex-end" }}>
             <div>
               <label>Name</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="HQ rollout" />
+              <input
+                aria-label="Token name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="HQ rollout"
+              />
             </div>
             <div>
               <label>Group</label>
-              <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+              <select aria-label="Token group" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
                 <option value="">None</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
@@ -75,11 +80,21 @@ export function Tokens() {
             </div>
             <div>
               <label>Expires (hours)</label>
-              <input value={hours} onChange={(e) => setHours(e.target.value.replace(/\D/g, ""))} placeholder="∞" />
+              <input
+                aria-label="Expires (hours)"
+                value={hours}
+                onChange={(e) => setHours(e.target.value.replace(/\D/g, ""))}
+                placeholder="∞"
+              />
             </div>
             <div>
               <label>Max uses</label>
-              <input value={maxUses} onChange={(e) => setMaxUses(e.target.value.replace(/\D/g, ""))} placeholder="∞" />
+              <input
+                aria-label="Max uses"
+                value={maxUses}
+                onChange={(e) => setMaxUses(e.target.value.replace(/\D/g, ""))}
+                placeholder="∞"
+              />
             </div>
             <button className="primary" disabled={!name}>
               Create token
@@ -90,7 +105,12 @@ export function Tokens() {
           <div style={{ marginTop: 12 }}>
             <label>Token — copy it now, it won’t be shown again</label>
             <div className="copybox">
-              <input readOnly value={created} onFocus={(e) => e.target.select()} />
+              <input
+                aria-label="Install token"
+                readOnly
+                value={created}
+                onFocus={(e) => e.target.select()}
+              />
               <button type="button" className="ghost" onClick={() => navigator.clipboard?.writeText(created)}>
                 Copy
               </button>

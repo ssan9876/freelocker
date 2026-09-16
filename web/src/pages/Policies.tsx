@@ -60,7 +60,12 @@ export function Policies() {
           <div className="toolbar" style={{ alignItems: "flex-end" }}>
             <div>
               <label>New policy name</label>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Baseline" />
+              <input
+                aria-label="New policy name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Baseline"
+              />
             </div>
             <button className="primary" disabled={!name}>
               Create policy
@@ -92,13 +97,21 @@ export function Policies() {
                     </a>
                   </td>
                   <td>
-                    <select value={p.mode} onChange={(e) => setMode(p.id, e.target.value)}>
+                    <select
+                      aria-label={`Mode for ${p.name}`}
+                      value={p.mode}
+                      onChange={(e) => setMode(p.id, e.target.value)}
+                    >
                       <option value="audit">Audit</option>
                       <option value="enforce">Enforce</option>
                     </select>
                   </td>
                   <td>
-                    <select defaultValue="" onChange={(e) => assign(p.id, e.target.value)}>
+                    <select
+                      aria-label={`Assign ${p.name} to a group`}
+                      defaultValue=""
+                      onChange={(e) => assign(p.id, e.target.value)}
+                    >
                       <option value="">Choose group…</option>
                       {groups.map((g) => (
                         <option key={g.id} value={g.id}>

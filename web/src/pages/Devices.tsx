@@ -65,7 +65,7 @@ export function Devices() {
       )}
       <div className="toolbar">
         <label style={{ margin: 0 }}>Status</label>
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select aria-label="Status filter" value={status} onChange={(e) => setStatus(e.target.value)}>
           {STATUSES.map((s) => (
             <option key={s} value={s}>
               {s === "" ? "All" : s.replace("_", " ")}

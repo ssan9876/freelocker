@@ -74,11 +74,12 @@ export function Tenants() {
           <div className="toolbar" style={{ alignItems: "flex-end" }}>
             <div>
               <label>Organization name</label>
-              <input value={orgName} onChange={(e) => setOrgName(e.target.value)} />
+              <input aria-label="Organization name" value={orgName} onChange={(e) => setOrgName(e.target.value)} />
             </div>
             <div>
               <label>Owner email</label>
               <input
+                aria-label="Owner email"
                 type="email"
                 value={ownerEmail}
                 onChange={(e) => setOwnerEmail(e.target.value)}
@@ -87,6 +88,7 @@ export function Tenants() {
             <div>
               <label>Owner password</label>
               <input
+                aria-label="Owner password"
                 type="password"
                 value={ownerPassword}
                 onChange={(e) => setOwnerPassword(e.target.value)}

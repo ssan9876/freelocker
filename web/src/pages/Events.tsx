@@ -29,7 +29,7 @@ export function Events() {
     <div>
       <div className="page-head">
         <h1>Activity</h1>
-        <select value={kind} onChange={(e) => setKind(e.target.value)}>
+        <select aria-label="Activity kind filter" value={kind} onChange={(e) => setKind(e.target.value)}>
           {KINDS.map((k) => (
             <option key={k.value} value={k.value}>
               {k.label}

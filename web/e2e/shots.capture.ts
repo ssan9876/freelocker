@@ -45,8 +45,12 @@ test("@shots capture console screens", async ({ page }) => {
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Continue" }).click();
 
+  // An already-seeded instance skips enrolment and asks for a code instead,
+  // and the enrolment secret only ever existed in the run that created it.
+  // start-demo.ps1 prints its secret; pass it here to capture that instance
+  // (with its content) rather than a bare first-run install.
   const enrol = page.getByText("Set up two-factor authentication");
-  let secret = "";
+  let secret = process.env.FREELOCKER_TOTP_SECRET ?? "";
   if (await seen(enrol)) {
     await page.screenshot({ path: `${dir}/03-mfa.png` });
     secret = await page.getByLabel("Setup key").inputValue();
