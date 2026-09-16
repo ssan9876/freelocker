@@ -221,3 +221,45 @@ func ringfenceVersion(r ResolvedRingfence) string {
 	}
 	return hex.EncodeToString(h.Sum(nil))[:32]
 }
+
+type RingfenceEvent struct {
+	ID       int64
+	DeviceID uuid.UUID
+	Hostname string
+	Kind     string // network|child_process
+	Program  string
+	Detail   string
+	Enforced bool
+	At       time.Time
+}
+
+func (s *Store) AppendRingfenceEvents(ctx context.Context, tenantID, deviceID uuid.UUID, evs []RingfenceEvent) error {
+	if len(evs) == 0 {
+		return nil
+	}
+	batch := &pgx.Batch{}
+	for _, e := range evs {
+		batch.Queue(`INSERT INTO ringfence_events (tenant_id, device_id, kind, program, detail, enforced, at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+			tenantID, deviceID, e.Kind, e.Program, e.Detail, e.Enforced, e.At)
+	}
+	br := s.pool.SendBatch(ctx, batch)
+	defer br.Close()
+	for range evs {
+		if _, err := br.Exec(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) ListRingfenceEvents(ctx context.Context, tenantID uuid.UUID, limit int) ([]RingfenceEvent, error) {
+	rows, _ := s.pool.Query(ctx, `
+		SELECT e.id, e.device_id, d.hostname, e.kind, e.program, e.detail, e.enforced, e.at
+		FROM ringfence_events e JOIN devices d ON d.id = e.device_id
+		WHERE e.tenant_id=$1 ORDER BY e.at DESC LIMIT $2`, tenantID, limit)
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (RingfenceEvent, error) {
+		var e RingfenceEvent
+		return e, r.Scan(&e.ID, &e.DeviceID, &e.Hostname, &e.Kind, &e.Program, &e.Detail, &e.Enforced, &e.At)
+	})
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"freelocker/internal/server/store"
 	"freelocker/internal/server/store/storetest"
@@ -162,5 +163,38 @@ func TestRingfenceForDevice(t *testing.T) {
 	// B tries to assign A's ringfence to B's group — must also be rejected.
 	if err := s.AssignRingfence(ctx, tenantB, groupB, rf.ID); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("B.AssignRingfence(B, GB, RA) err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestRingfenceEvents(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	dev := enrollTestDevice(t, s, tenant, nil, "pc1", "1.0.0")
+
+	evs := []store.RingfenceEvent{
+		{Kind: "network", Program: `C:\app.exe`, Detail: "203.0.113.5:443", Enforced: false, At: time.Now()},
+		{Kind: "child_process", Program: `C:\Program Files\Office\winword.exe`, Detail: "ASR D4F940AB…: powershell.exe", Enforced: true, At: time.Now()},
+	}
+	if err := s.AppendRingfenceEvents(ctx, tenant, dev, evs); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.ListRingfenceEvents(ctx, tenant, 10)
+	if err != nil || len(got) != 2 {
+		t.Fatalf("list = %+v, %v", got, err)
+	}
+	if got[0].Hostname != "pc1" {
+		t.Errorf("events must carry the hostname for the console: %+v", got[0])
+	}
+
+	// An empty batch is a no-op, not an error: the agent reports on a timer.
+	if err := s.AppendRingfenceEvents(ctx, tenant, dev, nil); err != nil {
+		t.Errorf("empty batch = %v", err)
+	}
+
+	// Another tenant sees none of it.
+	other, _ := s.CreateTenant(ctx, "Beta")
+	if got, _ := s.ListRingfenceEvents(ctx, other, 10); len(got) != 0 {
+		t.Errorf("cross-tenant list = %+v", got)
 	}
 }
