@@ -113,11 +113,30 @@ func (s *Store) LatestPolicyVersion(ctx context.Context, tenantID, policyID uuid
 	return v, err
 }
 
+// AssignPolicy points a group at a policy. Both must belong to the caller's
+// tenant: ErrNotFound otherwise.
+//
+// policy_assignments has group_id as its SOLE primary key, so the guards here
+// are load-bearing. Without the EXISTS checks one tenant could name another's
+// group, and without the tenant predicate on the ON CONFLICT branch the
+// UPDATE would silently repoint an existing assignment belonging to someone
+// else — leaving that tenant's devices pointing at a policy outside their
+// tenant, which resolves to no policy at all.
 func (s *Store) AssignPolicy(ctx context.Context, tenantID, groupID, policyID uuid.UUID) error {
-	_, err := s.pool.Exec(ctx, `
-		INSERT INTO policy_assignments (tenant_id, group_id, policy_id) VALUES ($1,$2,$3)
-		ON CONFLICT (group_id) DO UPDATE SET policy_id=EXCLUDED.policy_id`, tenantID, groupID, policyID)
-	return err
+	tag, err := s.pool.Exec(ctx, `
+		INSERT INTO policy_assignments (tenant_id, group_id, policy_id)
+		SELECT $1, $2, $3
+		WHERE EXISTS (SELECT 1 FROM device_groups WHERE tenant_id = $1 AND id = $2)
+		  AND EXISTS (SELECT 1 FROM policies      WHERE tenant_id = $1 AND id = $3)
+		ON CONFLICT (group_id) DO UPDATE SET policy_id = EXCLUDED.policy_id
+		  WHERE policy_assignments.tenant_id = $1`, tenantID, groupID, policyID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // EffectivePolicyForDevice returns the latest version for the policy
