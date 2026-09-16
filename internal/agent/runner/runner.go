@@ -20,6 +20,7 @@ import (
 	"freelocker/internal/agent/identity"
 	"freelocker/internal/agent/inventory"
 	"freelocker/internal/agent/metrics"
+	"freelocker/internal/agent/ringfence"
 	"freelocker/internal/agent/scan"
 	"freelocker/internal/appcontrol/signature"
 	"freelocker/internal/server/ca"
@@ -58,6 +59,11 @@ type Runner struct {
 	// Device controls (optional). When Controls is set, the runner pulls
 	// and applies device controls on the app-control tick.
 	Controls controls.Enforcer
+
+	// Ringfencing (optional). When Ringfence is set, the runner pulls and
+	// applies the device's ringfence on the app-control tick, and reports
+	// any violations the enforcer observes back to the server.
+	Ringfence ringfence.Enforcer
 
 	// Events (optional). When set, the runner reports device events
 	// (process launches, logons) on the metrics ticker.
@@ -162,7 +168,7 @@ func (r *Runner) session(ctx context.Context, connected func()) error {
 	}
 	connected()
 
-	if r.Enforcer != nil || r.Controls != nil {
+	if r.Enforcer != nil || r.Controls != nil || r.Ringfence != nil {
 		go r.appControlLoop(ctx, client)
 	}
 	if r.MetricsInterval > 0 {
@@ -245,6 +251,7 @@ func (r *Runner) appControlTick(ctx context.Context, client flv1.AgentClient) {
 		r.reportBlocks(ctx, client)
 	}
 	r.syncControls(ctx, client)
+	r.syncRingfence(ctx, client)
 }
 
 func (r *Runner) syncControls(ctx context.Context, client flv1.AgentClient) {
@@ -264,6 +271,54 @@ func (r *Runner) syncControls(ctx context.Context, client flv1.AgentClient) {
 		ElevationBlocked:  resp.GetElevationBlocked(),
 	}); err != nil {
 		r.log().Error("apply controls", "err", err)
+	}
+}
+
+// syncRingfence pulls the device's assigned ringfence, applies it if its
+// version changed, and reports any violations the enforcer observes. Apply
+// is skipped when the version is unchanged so an unattended agent does not
+// re-run reconciliation (firewall rules, ASR policy) every tick; Violations
+// is still polled every tick since it reads live security event logs that
+// change independently of the assigned ringfence's version.
+func (r *Runner) syncRingfence(ctx context.Context, client flv1.AgentClient) {
+	if r.Ringfence == nil {
+		return
+	}
+	resp, err := client.GetRingfence(ctx, &flv1.GetRingfenceRequest{})
+	if err != nil {
+		if status.Code(err) != codes.Unavailable {
+			r.log().Warn("get ringfence", "err", err)
+		}
+		return
+	}
+	if resp.GetVersion() != r.Ringfence.Status().Applied {
+		desired := ringfence.Ringfence{Version: resp.GetVersion(), Mode: resp.GetMode()}
+		for _, p := range resp.GetPrograms() {
+			desired.Programs = append(desired.Programs, ringfence.Program{Path: p.GetPath(), NetworkBlocked: p.GetNetworkBlocked()})
+		}
+		for _, p := range resp.GetProtections() {
+			desired.Protections = append(desired.Protections, ringfence.Protection{ASRRule: p.GetAsrRule(), Action: p.GetAction()})
+		}
+		if err := r.Ringfence.Apply(ctx, desired); err != nil {
+			r.log().Error("apply ringfence", "err", err)
+		}
+	}
+	vs, err := r.Ringfence.Violations(ctx)
+	if err != nil {
+		r.log().Error("read ringfence violations", "err", err)
+		return
+	}
+	if len(vs) == 0 {
+		return
+	}
+	req := &flv1.ReportRingfenceEventsRequest{}
+	for _, v := range vs {
+		req.Events = append(req.Events, &flv1.RingfenceEvent{
+			Kind: v.Kind, Program: v.Program, Detail: v.Detail, Enforced: v.Enforced, AtUnix: v.At.Unix(),
+		})
+	}
+	if _, err := client.ReportRingfenceEvents(ctx, req); err != nil {
+		r.log().Warn("report ringfence violations", "err", err)
 	}
 }
 

@@ -23,6 +23,7 @@ type WinEnforcer struct {
 
 	mu      sync.Mutex
 	applied string
+	last    Ringfence
 }
 
 func Default(agentImages []string) Enforcer {
@@ -53,6 +54,7 @@ func (e *WinEnforcer) Apply(_ context.Context, r Ringfence) error {
 		return err
 	}
 	e.applied = r.Version
+	e.last = r
 	return nil
 }
 
@@ -138,9 +140,36 @@ func (e *WinEnforcer) applyASR(r Ringfence) error {
 // enforce produces 5157 (blocked), audit produces 5156 (allowed, would have
 // been blocked).
 func (e *WinEnforcer) Violations(_ context.Context) ([]Violation, error) {
-	// The caller sets the ringfenced set and mode through Apply; re-read
-	// them from the last applied ringfence held by the runner (Task 9).
-	return nil, nil
+	e.mu.Lock()
+	last := e.last
+	e.mu.Unlock()
+	if last.Version == "" {
+		return nil, nil
+	}
+	set := make(map[string]bool, len(last.Programs))
+	for _, p := range last.Programs {
+		if p.NetworkBlocked {
+			set[strings.ToLower(p.Path)] = true
+		}
+	}
+	id := "5156"
+	if last.Mode == "enforce" {
+		id = "5157"
+	}
+	var out []Violation
+	if raw, err := exec.Command("wevtutil", "qe", "Security",
+		"/q:*[System[(EventID="+id+")]]", "/c:500", "/rd:true", "/f:xml").Output(); err == nil {
+		if v, err := ParseWFP(raw, set); err == nil {
+			out = append(out, v...)
+		}
+	}
+	if raw, err := exec.Command("wevtutil", "qe", "Microsoft-Windows-Windows Defender/Operational",
+		"/q:*[System[(EventID=1121 or EventID=1122)]]", "/c:200", "/rd:true", "/f:xml").Output(); err == nil {
+		if v, err := ParseDefenderASR(raw); err == nil {
+			out = append(out, v...)
+		}
+	}
+	return Dedupe(out, 200), nil
 }
 
 func (e *WinEnforcer) Status() Status {

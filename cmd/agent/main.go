@@ -21,6 +21,7 @@ import (
 	"freelocker/internal/agent/executor"
 	"freelocker/internal/agent/identity"
 	"freelocker/internal/agent/inventory"
+	"freelocker/internal/agent/ringfence"
 	"freelocker/internal/agent/runner"
 	"freelocker/internal/agent/secret"
 	"freelocker/internal/agent/service"
@@ -107,6 +108,11 @@ func runAgent(log *slog.Logger) error {
 	r.Enforcer = enforcer.Default(paths.DataDir)
 	r.Controls = controls.Default(cfg.ServerURL)
 	r.Events = events.NewReader()
+	self, err := os.Executable()
+	if err != nil {
+		self = ""
+	}
+	r.Ringfence = ringfence.Default([]string{self, paths.UpdaterExe()})
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()

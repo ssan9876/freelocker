@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	flv1 "freelocker/gen/freelocker/v1"
 	"freelocker/internal/agent/agentpaths"
@@ -94,7 +93,7 @@ func (a *Actions) UpdateAgent(ctx context.Context, cmd *flv1.Command) error {
 	}
 	plan := updater.Plan{
 		CurrentExe: current, NewExe: staged, ServiceName: "FreeLockerAgent",
-		UpdaterExe: filepath.Join(a.Paths.InstallDir, "agent-updater.exe"),
+		UpdaterExe: a.Paths.UpdaterExe(),
 	}
 	if err := exec.Command(plan.UpdaterExe, plan.SwapArgs()...).Start(); err != nil {
 		return err

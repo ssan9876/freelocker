@@ -17,6 +17,7 @@ func (p Paths) Cert() string       { return filepath.Join(p.DataDir, "device.crt
 func (p Paths) CA() string         { return filepath.Join(p.DataDir, "ca.crt") }
 func (p Paths) Enrollment() string { return filepath.Join(p.DataDir, "enrollment.json") }
 func (p Paths) Log() string        { return filepath.Join(p.DataDir, "agent.log") }
+func (p Paths) UpdaterExe() string { return filepath.Join(p.InstallDir, "agent-updater.exe") }
 
 // defaultDirs is overridden on Windows.
 var defaultDirs = func() (install, data string) {
