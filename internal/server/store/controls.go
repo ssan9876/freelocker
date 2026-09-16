@@ -68,17 +68,35 @@ func (s *Store) SetDeviceOverrides(ctx context.Context, tenantID, deviceID uuid.
 	return err
 }
 
+// SetControls stores a group's controls. The group must belong to the
+// caller's tenant: ErrNotFound otherwise.
+//
+// device_controls has group_id as its SOLE primary key, and group_id does
+// not determine the tenant — the caller names the group — so the guards
+// here are load-bearing. Without the EXISTS check one tenant could name
+// another's group, and without the tenant predicate on the ON CONFLICT
+// branch the UPDATE would rewrite an existing row belonging to someone
+// else, clearing a block they believe is enforced or cutting their fleet
+// off the network. Compare AssignPolicy, which is the same shape.
 func (s *Store) SetControls(ctx context.Context, tenantID, groupID uuid.UUID, c DeviceControls) error {
-	_, err := s.pool.Exec(ctx, `
+	tag, err := s.pool.Exec(ctx, `
 		INSERT INTO device_controls (tenant_id, group_id, usb_storage_blocked, network_blocked, elevation_blocked, updated_at)
-		VALUES ($1,$2,$3,$4,$5, now())
+		SELECT $1, $2, $3, $4, $5, now()
+		WHERE EXISTS (SELECT 1 FROM device_groups WHERE tenant_id = $1 AND id = $2)
 		ON CONFLICT (group_id) DO UPDATE SET
 			usb_storage_blocked=EXCLUDED.usb_storage_blocked,
 			network_blocked=EXCLUDED.network_blocked,
 			elevation_blocked=EXCLUDED.elevation_blocked,
-			updated_at=now()`,
+			updated_at=now()
+		WHERE device_controls.tenant_id = $1`,
 		tenantID, groupID, c.USBStorageBlocked, c.NetworkBlocked, c.ElevationBlocked)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) GetControls(ctx context.Context, tenantID, groupID uuid.UUID) (DeviceControls, error) {
