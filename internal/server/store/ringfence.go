@@ -199,6 +199,27 @@ func (s *Store) GroupRingfenceID(ctx context.Context, tenantID, groupID uuid.UUI
 // RingfenceForDevice resolves the ringfence assigned to the device's group.
 // ErrNotFound when the device has no group or its group has no ringfence —
 // the agent API turns that into "nothing to enforce".
+// DeviceRingfence returns the ringfence assigned to a device's group, with
+// its identity intact. ErrNotFound when the device has no group, no
+// assignment, or is not in this tenant.
+//
+// Distinct from RingfenceForDevice, which resolves the CONTENT the agent
+// enforces (mode, programs, protections) and deliberately omits the name.
+// The console needs the opposite: the name and id, to say which ringfence
+// is applied and to link to it.
+func (s *Store) DeviceRingfence(ctx context.Context, tenantID, deviceID uuid.UUID) (Ringfence, error) {
+	row := s.pool.QueryRow(ctx, `
+		SELECT rp.id, rp.name, rp.mode, rp.created_at FROM devices d
+		JOIN ringfence_assignments ra ON ra.group_id = d.group_id AND ra.tenant_id = d.tenant_id
+		JOIN ringfence_policies rp ON rp.id = ra.ringfence_id AND rp.tenant_id = $1
+		WHERE d.tenant_id = $1 AND d.id = $2`, tenantID, deviceID)
+	rf, err := scanRingfence(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Ringfence{}, ErrNotFound
+	}
+	return rf, err
+}
+
 func (s *Store) RingfenceForDevice(ctx context.Context, tenantID, deviceID uuid.UUID) (ResolvedRingfence, error) {
 	var rfID uuid.UUID
 	var out ResolvedRingfence

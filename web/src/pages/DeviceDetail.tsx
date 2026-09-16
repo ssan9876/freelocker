@@ -7,12 +7,14 @@ import {
   ControlKey,
   DeviceControlsView,
   DeviceDetail as Detail,
+  DeviceRingfence,
   Group,
   MetricSample,
   Observation,
   Policy,
   RingfenceEvent,
 } from "../api";
+import { asrDescription } from "../asr";
 import { useAuth } from "../auth";
 import { StatusDot } from "../components/StatusDot";
 import { Confirm } from "../components/Confirm";
@@ -53,6 +55,7 @@ export function DeviceDetail() {
   const canEdit = me?.role !== "readonly";
   const [ctl, setCtl] = useState<DeviceControlsView | null>(null);
   const [ringfenceEvents, setRingfenceEvents] = useState<RingfenceEvent[]>([]);
+  const [rf, setRf] = useState<DeviceRingfence | null>(null);
   const [promoteTo, setPromoteTo] = useState("");
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -71,6 +74,7 @@ export function DeviceDetail() {
       .get<RingfenceEvent[]>(`/api/ringfence-events?limit=500&device_id=${id}`)
       .then(setRingfenceEvents)
       .catch(() => {});
+    api.get<DeviceRingfence>(`/api/devices/${id}/ringfence`).then(setRf).catch(() => setRf(null));
   };
 
   useEffect(() => {
@@ -289,11 +293,59 @@ export function DeviceDetail() {
       <div className="panel" style={{ marginTop: 20 }}>
         <h2>Ringfence enforcement</h2>
         <p className="who" style={{ marginTop: -8 }}>
-          The console does not yet expose this device's effective ringfence assignment — that requires a
-          read endpoint this task did not add. This is the device's recent ringfence activity reported by
-          the agent; "Enforced" means the action was actually blocked, not just logged.
+          What this device is contained by, and the activity the agent has reported. "Enforced" means the
+          action was actually blocked; otherwise it was only logged.
         </p>
         <dl className="facts" style={{ marginBottom: 16 }}>
+          <dt>Ringfence</dt>
+          <dd>
+            {!rf || !rf.ringfence ? (
+              <span className="badge role">None — inherited from this device's group</span>
+            ) : (
+              <>
+                <a onClick={() => nav(`/ringfences/${rf.ringfence!.id}`)} style={{ cursor: "pointer" }}>
+                  {rf.ringfence.name}
+                </a>{" "}
+                <span className={`badge ${rf.ringfence.mode === "enforce" ? "fail" : "role"}`}>
+                  {rf.ringfence.mode === "enforce" ? "Enforcing" : "Audit only"}
+                </span>
+              </>
+            )}
+          </dd>
+          {rf?.ringfence && (
+            <>
+              <dt>Contained programs</dt>
+              <dd>
+                {rf.programs.length === 0 ? (
+                  <span className="who">No programs — nothing is network-contained.</span>
+                ) : (
+                  <ul className="plain">
+                    {rf.programs.map((p) => (
+                      <li key={p.id}>
+                        <span className="mono">{p.path}</span>{" "}
+                        {p.network_blocked && <span className="badge fail">Network blocked</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </dd>
+              <dt>Child-process rules</dt>
+              <dd>
+                {rf.protections.length === 0 ? (
+                  <span className="who">None enabled.</span>
+                ) : (
+                  <ul className="plain">
+                    {rf.protections.map((p) => (
+                      <li key={p.asr_rule}>
+                        {asrDescription(p.asr_rule)}{" "}
+                        <span className={`badge ${p.action === "block" ? "fail" : "role"}`}>{p.action}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </dd>
+            </>
+          )}
           <dt>ASR protections</dt>
           <dd>
             {d.asr_available === null ? (

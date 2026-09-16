@@ -229,6 +229,14 @@ export type RingfenceDetail = {
   programs: RingfenceProgram[];
   protections: RingfenceProtection[];
 };
+// What is contained on one device. `ringfence` is null when the device's
+// group has no assignment — distinct from the request failing, which is why
+// the endpoint answers 200 rather than 404 in that case.
+export type DeviceRingfence = {
+  ringfence: Ringfence | null;
+  programs: RingfenceProgram[];
+  protections: RingfenceProtection[];
+};
 export type RingfenceEvent = {
   id: number;
   device_id: string;

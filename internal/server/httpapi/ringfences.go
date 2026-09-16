@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -338,4 +339,64 @@ func (a *API) listRingfenceEvents(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// getDeviceRingfence returns the ringfence in effect on one device, with the
+// programs and protections it contains.
+//
+// A device with no ringfence is a 200 carrying a null ringfence, not a 404:
+// "this device is not contained" and "this device does not exist" are
+// different answers, and the console must be able to tell them apart. A
+// missing device is still a 404, which is why the device is looked up first.
+func (a *API) getDeviceRingfence(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	ctx, tenant := r.Context(), principalFrom(r).TenantID
+
+	if _, err := a.Store.GetDevice(ctx, tenant, id); err != nil {
+		a.storeErr(w, err)
+		return
+	}
+
+	rf, err := a.Store.DeviceRingfence(ctx, tenant, id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ringfence": nil, "programs": []any{}, "protections": []any{},
+		})
+		return
+	}
+	if err != nil {
+		a.storeErr(w, err)
+		return
+	}
+
+	progs, err := a.Store.ListRingfencePrograms(ctx, tenant, rf.ID)
+	if err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	progOut := make([]map[string]any, 0, len(progs))
+	for _, pr := range progs {
+		progOut = append(progOut, map[string]any{
+			"id": pr.ID.String(), "path": pr.Path, "network_blocked": pr.NetworkBlocked, "note": pr.Note,
+		})
+	}
+
+	prots, err := a.Store.ListRingfenceProtections(ctx, tenant, rf.ID)
+	if err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	protOut := make([]map[string]any, 0, len(prots))
+	for _, pt := range prots {
+		protOut = append(protOut, map[string]any{"asr_rule": pt.ASRRule, "action": pt.Action})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ringfence":   ringfenceJSON{ID: rf.ID.String(), Name: rf.Name, Mode: rf.Mode, CreatedAt: rf.CreatedAt},
+		"programs":    progOut,
+		"protections": protOut,
+	})
 }

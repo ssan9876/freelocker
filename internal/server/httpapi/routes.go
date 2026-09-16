@@ -31,6 +31,7 @@ func (a *API) routes(r chi.Router) {
 	r.Get("/api/events", a.listDeviceEvents)
 	r.Get("/api/groups/{id}/controls", a.getControls)
 	r.Get("/api/devices/{id}/controls", a.getDeviceControls)
+	r.Get("/api/devices/{id}/ringfence", a.getDeviceRingfence)
 	r.Get("/api/rollouts", a.listRollouts)
 	r.Get("/api/rollouts/{id}", a.getRollout)
 	r.Get("/api/notifications/status", a.notificationStatus)

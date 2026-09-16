@@ -234,3 +234,64 @@ func TestRingfenceEventsFilterByDevice(t *testing.T) {
 		t.Errorf("ListRingfenceEvents(nil) = %+v, want both events (unfiltered)", got)
 	}
 }
+
+// The console needs the ringfence's identity — name and id — to show which
+// one is applied to a device and link to it. RingfenceForDevice deliberately
+// returns only the resolved content the AGENT needs (mode, programs,
+// protections) and never the name, so the console needs its own read.
+func TestDeviceRingfence(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	group, _ := s.CreateDeviceGroup(ctx, tenant, "WS")
+	dev := enrollTestDevice(t, s, tenant, &group, "pc1", "1.0.0")
+
+	if _, err := s.DeviceRingfence(ctx, tenant, dev); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("unassigned err = %v, want ErrNotFound", err)
+	}
+
+	rf := store.Ringfence{ID: uuid.New(), Name: "Office", Mode: "enforce"}
+	if err := s.CreateRingfence(ctx, tenant, rf); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AssignRingfence(ctx, tenant, group, rf.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.DeviceRingfence(ctx, tenant, dev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != rf.ID || got.Name != "Office" || got.Mode != "enforce" {
+		t.Fatalf("got %+v, want Office/enforce with id %s", got, rf.ID)
+	}
+
+	// Unassigning takes it away again, so the console cannot keep showing a
+	// ringfence that no longer applies.
+	if err := s.UnassignRingfence(ctx, tenant, group); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DeviceRingfence(ctx, tenant, dev); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("after unassign err = %v, want ErrNotFound", err)
+	}
+}
+
+// A device must never resolve to another tenant's ringfence, even when the
+// ids are known. Mirrors the cross-tenant tests on policies and controls.
+func TestDeviceRingfenceIsTenantScoped(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenantA, _ := s.CreateTenant(ctx, "Acme")
+	groupA, _ := s.CreateDeviceGroup(ctx, tenantA, "A-WS")
+	devA := enrollTestDevice(t, s, tenantA, &groupA, "a-pc", "1.0.0")
+	rfA := store.Ringfence{ID: uuid.New(), Name: "A-Office", Mode: "audit"}
+	s.CreateRingfence(ctx, tenantA, rfA)
+	s.AssignRingfence(ctx, tenantA, groupA, rfA.ID)
+
+	tenantB, _ := s.CreateTenant(ctx, "Beta")
+
+	// B asking about A's device gets nothing, not A's ringfence name.
+	if _, err := s.DeviceRingfence(ctx, tenantB, devA); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("B reading A's device = %v, want ErrNotFound", err)
+	}
+}
