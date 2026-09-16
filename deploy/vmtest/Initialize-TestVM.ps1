@@ -100,7 +100,7 @@ try {
     $warnings = @()
 
     if ($baseline.FreeLockerService -or $baseline.InstallDirExists) {
-        $warnings += "The agent appears to be installed already — this is not a clean guest."
+        $warnings += "The agent appears to be installed already - this is not a clean guest."
     }
     if ($baseline.RingfenceRules.Count -gt 0) {
         $warnings += "Guest already has FreeLocker-RF-* firewall rules: $($baseline.RingfenceRules -join ', ')"

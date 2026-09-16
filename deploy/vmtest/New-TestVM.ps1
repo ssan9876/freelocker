@@ -84,8 +84,8 @@ No .iso found under $Root.
 
 Download a free evaluation image (no product key, 180 days) from the
 Microsoft Evaluation Center and drop it anywhere under ${Root}:
-  - Windows Server 2025 Standard (Desktop Experience) — no TPM needed
-  - Windows 11 Enterprise — closer to a real endpoint, needs -EnableTPM
+  - Windows Server 2025 Standard (Desktop Experience) - no TPM needed
+  - Windows 11 Enterprise - closer to a real endpoint, needs -EnableTPM
 "@
     }
     Write-Host "Using ISO: $($iso.FullName)"
@@ -171,6 +171,6 @@ Write-Host "During setup:"
 Write-Host "  - Choose the Desktop Experience edition if offered."
 Write-Host "  - Skip the product key (evaluation editions do not need one)."
 Write-Host "  - Set a local Administrator password you will pass to"
-Write-Host "    Initialize-TestVM.ps1 — PowerShell Direct authenticates with it."
+Write-Host "    Initialize-TestVM.ps1 - PowerShell Direct authenticates with it."
 Write-Host ""
 Write-Host "Then run: ./Initialize-TestVM.ps1 -VMName `"$VMName`""

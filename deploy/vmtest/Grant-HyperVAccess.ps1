@@ -7,7 +7,7 @@
     the local "Hyper-V Administrators" group. The group is the better choice
     for a test harness: it grants VM management and nothing else.
 
-    Run this WITHOUT elevation — it re-launches itself through UAC and passes
+    Run this WITHOUT elevation - it re-launches itself through UAC and passes
     the original user's name across, because the elevated session can run as
     a different account and would otherwise add the wrong one.
 
@@ -65,12 +65,12 @@ $isAdmin = ([Security.Principal.WindowsPrincipal] `
 if (-not $isAdmin) {
     if (Test-Member -Group $group -User $UserName) {
         Write-Host "$UserName is already a member of '$group'." -ForegroundColor Green
-        Write-Host "If Hyper-V still refuses, sign out and back in — group"
+        Write-Host "If Hyper-V still refuses, sign out and back in - group"
         Write-Host "membership is baked into your login token at sign-in."
         return
     }
 
-    Write-Host "Elevation required — accept the UAC prompt."
+    Write-Host "Elevation required - accept the UAC prompt."
     Write-Host "Adding: $UserName"
 
     try {
@@ -89,10 +89,10 @@ if (-not $isAdmin) {
         Write-Host ""
         Write-Host "$UserName added to '$group'." -ForegroundColor Green
         Write-Host ""
-        Write-Host "SIGN OUT AND BACK IN before this takes effect —" -ForegroundColor Yellow
+        Write-Host "SIGN OUT AND BACK IN before this takes effect -" -ForegroundColor Yellow
         Write-Host "group membership is baked into your login token." -ForegroundColor Yellow
     } else {
-        Write-Warning "Membership not confirmed — the elevated run may have been cancelled."
+        Write-Warning "Membership not confirmed - the elevated run may have been cancelled."
     }
     return
 }
