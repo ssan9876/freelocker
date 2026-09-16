@@ -25,7 +25,11 @@ export function RingfenceDetail() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [name, setName] = useState("");
   const [path, setPath] = useState("");
-  const [networkBlocked, setNetworkBlocked] = useState(false);
+  // Defaults to checked: an unchecked program is completely inert (no
+  // firewall rule AND excluded from the WFP match set), which is a dead row
+  // for the natural "add the program, then decide" flow. Matches the
+  // schema's DEFAULT true (0020_ringfencing.sql) and the API default.
+  const [networkBlocked, setNetworkBlocked] = useState(true);
   const [note, setNote] = useState("");
   const [assignGroup, setAssignGroup] = useState("");
   const [confirmEnforce, setConfirmEnforce] = useState(false);
@@ -87,7 +91,7 @@ export function RingfenceDetail() {
     try {
       await api.post(`/api/ringfences/${id}/programs`, { path, network_blocked: networkBlocked, note });
       setPath("");
-      setNetworkBlocked(false);
+      setNetworkBlocked(true);
       setNote("");
       load();
     } catch (e) {
@@ -118,6 +122,7 @@ export function RingfenceDetail() {
     try {
       await api.post(`/api/ringfences/${id}/assign`, { group_id: assignGroup });
       notify("Ringfence assigned to group");
+      load();
     } catch (e) {
       notify(e instanceof ApiError ? e.message : "Could not assign ringfence", "error");
     }
@@ -126,8 +131,13 @@ export function RingfenceDetail() {
   const unassign = async () => {
     if (!assignGroup) return;
     try {
-      await api.del(`/api/groups/${assignGroup}/ringfence`);
+      // The server is authoritative on what is currently assigned: pass
+      // this ringfence's own id so a group that has since been reassigned
+      // to a different ringfence is not silently detached from that one
+      // instead (409 Conflict), surfaced through the normal notify path.
+      await api.del(`/api/groups/${assignGroup}/ringfence?ringfence_id=${id}`);
       notify("Ringfence unassigned from group");
+      load();
     } catch (e) {
       notify(e instanceof ApiError ? e.message : "Could not unassign ringfence", "error");
     }

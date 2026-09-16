@@ -146,26 +146,61 @@ Both reuse the `wevtutil qe` + parse pattern already in
 `internal/agent/events` (4688/4624).
 
 **5156 is extremely noisy** — it fires for every outbound connection on the
-machine. Three-layer mitigation, all required:
+machine. Four-layer mitigation, all required:
 
 1. filter by `Application` matching a ringfenced path *before* parsing;
-2. dedupe by `(program, remote IP, port)` within the reporting interval;
-3. cap the batch size per report.
+2. a per-source watermark (the Windows event `RecordId`, one for the
+   Security log and one for the Defender Operational log) so `wevtutil` is
+   queried with an `EventRecordID>N` filter and only ever returns records
+   newer than the highest one already seen — without this, dedupe alone
+   still re-reads and re-reports the same connections every tick;
+3. dedupe by `(program, remote IP, port)` within one batch;
+4. cap the batch size per report.
 
 Without this, audit mode on a busy machine floods the tenant's event table.
+`Violation.At` carries the event's own `TimeCreated` timestamp (not the time
+the agent happened to parse it), so the server can also deduplicate/order on
+real event time.
+
+**The ASR value-deletion boundary.** The Defender ASR policy key
+(`HKLM\...\ASR\Rules`) is also where GPO and Intune write policy, so the
+enforcer must never delete a value it did not write itself. It restricts
+deletions to the curated six-GUID set (`CuratedASRRules` in
+`internal/agent/ringfence`, kept in sync with `asrRules` in
+`internal/server/httpapi/ringfences.go` — the agent cannot import the server
+package, so the set is duplicated, not shared).
 
 ## HTTP API (admin writes; reads any role)
 
+Routes match the repo's existing policy routes (`/api/policies/{id}/mode`,
+`/api/policies/{id}/assign`) rather than the `PATCH`/`PUT`-on-the-resource
+shape this section originally sketched — that shape shipped for the policy
+API first and ringfencing follows the precedent instead of introducing a
+second style:
+
 - `GET|POST /api/ringfences`, `GET|PATCH|DELETE /api/ringfences/{id}`
-  (`PATCH` covers rename and mode)
+  (`PATCH` is rename only; mode is its own route below)
+- `POST /api/ringfences/{id}/mode` — body `{mode}`
 - `GET|POST /api/ringfences/{id}/programs`, `DELETE /api/ringfences/{id}/programs/{pid}`
 - `PUT /api/ringfences/{id}/protections` — body `{asr_rule, action}`, upserts
   that one rule's action; `action: "off"` deletes the row
-- `PUT /api/groups/{id}/ringfence` (assign), `DELETE` (unassign)
-- `GET /api/ringfence-events`
+- `POST /api/ringfences/{id}/assign` — body `{group_id}`
+- `DELETE /api/groups/{id}/ringfence?ringfence_id={id}` (unassign) — `{id}`
+  in the path is the GROUP id (this route lives under `/api/groups`, mirroring
+  `/api/groups/{id}/controls`), and `ringfence_id` is required: the server
+  looks up the group's current assignment and returns 409 Conflict if it
+  does not match, rather than detaching whatever ringfence happens to be
+  assigned. Without this, an admin viewing ringfence A who selects a group
+  currently assigned to ringfence B and clicks Unassign would silently
+  detach B.
+- `GET /api/ringfence-events` — optional `?device_id=` filters server-side to
+  one device; needed because the list is capped and a busy tenant's newest
+  rows can otherwise contain none for a quieter device.
 
-Audited as `ringfence.create|update|delete|assign|unassign|program|protection`;
+Audited as `ringfence.create|rename|delete|mode|assign|unassign|program|protection`;
 a mode change is audited distinctly from a rename, as policy mode changes are.
+`ringfence.unassign` is audited against the ringfence id (not the group id),
+matching how every other `ringfence.*` action is recorded.
 
 ## Console
 

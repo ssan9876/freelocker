@@ -63,9 +63,13 @@ export function DeviceDetail() {
     api.get<Observation[]>(`/api/devices/${id}/observations?limit=100`).then(setObs).catch(() => {});
     api.get<MetricSample[]>(`/api/devices/${id}/metrics?limit=120`).then(setSamples).catch(() => {});
     api.get<DeviceControlsView>(`/api/devices/${id}/controls`).then(setCtl).catch(() => {});
+    // Server-side device_id filter: the tenant-wide feed is capped, so on a
+    // busy tenant the newest 500 rows can contain none for this device even
+    // though it has real violations, producing a false "no activity" (a
+    // client-side filter after the fact does not fix this).
     api
-      .get<RingfenceEvent[]>(`/api/ringfence-events?limit=500`)
-      .then((evs) => setRingfenceEvents(evs.filter((e) => e.device_id === id)))
+      .get<RingfenceEvent[]>(`/api/ringfence-events?limit=500&device_id=${id}`)
+      .then(setRingfenceEvents)
       .catch(() => {});
   };
 

@@ -180,6 +180,22 @@ func (s *Store) UnassignRingfence(ctx context.Context, tenantID, groupID uuid.UU
 		`DELETE FROM ringfence_assignments WHERE tenant_id=$1 AND group_id=$2`, tenantID, groupID))
 }
 
+// GroupRingfenceID returns the ringfence currently assigned to a group, or
+// ErrNotFound when the group has none. The HTTP layer uses this to make
+// unassign authoritative: the caller states which ringfence it means to
+// detach, and the server refuses when that no longer matches reality
+// instead of blindly deleting whatever row the group happens to have.
+func (s *Store) GroupRingfenceID(ctx context.Context, tenantID, groupID uuid.UUID) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := s.pool.QueryRow(ctx,
+		`SELECT ringfence_id FROM ringfence_assignments WHERE tenant_id=$1 AND group_id=$2`,
+		tenantID, groupID).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.UUID{}, ErrNotFound
+	}
+	return id, err
+}
+
 // RingfenceForDevice resolves the ringfence assigned to the device's group.
 // ErrNotFound when the device has no group or its group has no ringfence —
 // the agent API turns that into "nothing to enforce".
@@ -253,11 +269,18 @@ func (s *Store) AppendRingfenceEvents(ctx context.Context, tenantID, deviceID uu
 	return nil
 }
 
-func (s *Store) ListRingfenceEvents(ctx context.Context, tenantID uuid.UUID, limit int) ([]RingfenceEvent, error) {
+// ListRingfenceEvents lists a tenant's ringfence events, newest first. When
+// deviceID is non-nil the list is filtered server-side to that device — the
+// console needs this because the tenant-wide feed is capped (the same cap
+// that bounds it here), so a busy tenant's newest N rows can easily contain
+// none for a quieter device, and client-side filtering after the fact would
+// silently report "no activity" for a device that actually has violations.
+func (s *Store) ListRingfenceEvents(ctx context.Context, tenantID uuid.UUID, limit int, deviceID *uuid.UUID) ([]RingfenceEvent, error) {
 	rows, _ := s.pool.Query(ctx, `
 		SELECT e.id, e.device_id, d.hostname, e.kind, e.program, e.detail, e.enforced, e.at
 		FROM ringfence_events e JOIN devices d ON d.id = e.device_id
-		WHERE e.tenant_id=$1 ORDER BY e.at DESC LIMIT $2`, tenantID, limit)
+		WHERE e.tenant_id=$1 AND ($3::uuid IS NULL OR e.device_id=$3)
+		ORDER BY e.at DESC LIMIT $2`, tenantID, limit, deviceID)
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (RingfenceEvent, error) {
 		var e RingfenceEvent
 		return e, r.Scan(&e.ID, &e.DeviceID, &e.Hostname, &e.Kind, &e.Program, &e.Detail, &e.Enforced, &e.At)

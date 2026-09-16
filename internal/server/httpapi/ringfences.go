@@ -166,8 +166,13 @@ func (a *API) addRingfenceProgram(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Path           string `json:"path"`
-		NetworkBlocked bool   `json:"network_blocked"`
+		Path string `json:"path"`
+		// NetworkBlocked is a pointer so an absent field can default to
+		// true, matching the schema's DEFAULT true (0020_ringfencing.sql)
+		// and the obvious intent of adding a program to a ringfence. A
+		// plain bool's zero value is false, which would silently create a
+		// dead row: no firewall rule AND excluded from the WFP match set.
+		NetworkBlocked *bool  `json:"network_blocked"`
 		Note           string `json:"note"`
 	}
 	if !readJSON(w, r, &req) {
@@ -178,15 +183,19 @@ func (a *API) addRingfenceProgram(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "path is required")
 		return
 	}
+	networkBlocked := true
+	if req.NetworkBlocked != nil {
+		networkBlocked = *req.NetworkBlocked
+	}
 	p := principalFrom(r)
 	progID := uuid.New()
 	if err := a.Store.AddRingfenceProgram(r.Context(), p.TenantID, id, store.RingfenceProgram{
-		ID: progID, Path: req.Path, NetworkBlocked: req.NetworkBlocked, Note: req.Note,
+		ID: progID, Path: req.Path, NetworkBlocked: networkBlocked, Note: req.Note,
 	}); err != nil {
 		a.storeErr(w, err)
 		return
 	}
-	a.audit(r, p, "ringfence.program", "ringfence", id.String(), map[string]any{"path": req.Path, "network_blocked": req.NetworkBlocked}, "success")
+	a.audit(r, p, "ringfence.program", "ringfence", id.String(), map[string]any{"path": req.Path, "network_blocked": networkBlocked}, "success")
 	writeJSON(w, http.StatusCreated, map[string]string{"id": progID.String()})
 }
 
@@ -263,22 +272,59 @@ func (a *API) assignRingfence(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// unassignRingfence is routed as DELETE /api/groups/{id}/ringfence, so `id`
+// here is the GROUP id. The caller must also say which ringfence it means to
+// detach via the ?ringfence_id= query parameter: without that, a console
+// user viewing ringfence A who selects a group currently assigned to
+// ringfence B and clicks Unassign would silently detach B, reverting every
+// device in that group's firewall/ASR state, while the audit trail recorded
+// the action against A. The server is authoritative here — a mismatch (the
+// group's current assignment differs from what the caller believes it is)
+// is a 409, not a silent detach of whatever happens to be there.
 func (a *API) unassignRingfence(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r)
+	groupID, ok := pathID(w, r)
 	if !ok {
 		return
 	}
+	rfParam := strings.TrimSpace(r.URL.Query().Get("ringfence_id"))
+	if rfParam == "" {
+		writeErr(w, http.StatusBadRequest, "ringfence_id is required")
+		return
+	}
+	rfID, err := uuid.Parse(rfParam)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid ringfence_id")
+		return
+	}
 	p := principalFrom(r)
-	if err := a.Store.UnassignRingfence(r.Context(), p.TenantID, id); err != nil {
+	current, err := a.Store.GroupRingfenceID(r.Context(), p.TenantID, groupID)
+	if err != nil {
 		a.storeErr(w, err)
 		return
 	}
-	a.audit(r, p, "ringfence.unassign", "group", id.String(), nil, "success")
+	if current != rfID {
+		writeErr(w, http.StatusConflict, "group is no longer assigned to this ringfence")
+		return
+	}
+	if err := a.Store.UnassignRingfence(r.Context(), p.TenantID, groupID); err != nil {
+		a.storeErr(w, err)
+		return
+	}
+	a.audit(r, p, "ringfence.unassign", "ringfence", rfID.String(), map[string]any{"group_id": groupID.String()}, "success")
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *API) listRingfenceEvents(w http.ResponseWriter, r *http.Request) {
-	events, err := a.Store.ListRingfenceEvents(r.Context(), principalFrom(r).TenantID, queryInt(r, "limit", 200, 1000))
+	var deviceID *uuid.UUID
+	if q := strings.TrimSpace(r.URL.Query().Get("device_id")); q != "" {
+		id, err := uuid.Parse(q)
+		if err != nil {
+			writeErr(w, http.StatusBadRequest, "invalid device_id")
+			return
+		}
+		deviceID = &id
+	}
+	events, err := a.Store.ListRingfenceEvents(r.Context(), principalFrom(r).TenantID, queryInt(r, "limit", 200, 1000), deviceID)
 	if err != nil {
 		a.storeErr(w, err)
 		return

@@ -3,6 +3,8 @@ package httpapi_test
 import (
 	"context"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func TestRingfenceAPI(t *testing.T) {
@@ -67,5 +69,89 @@ func TestRingfenceAPI(t *testing.T) {
 		if !seen[want] {
 			t.Errorf("missing audit action %s", want)
 		}
+	}
+}
+
+// TestAddRingfenceProgramDefaultsNetworkBlockedTrue covers FINDING 5: the
+// schema's DEFAULT true and the console must agree. Omitting the field
+// entirely (not sending false) must default to true, matching the schema.
+func TestAddRingfenceProgramDefaultsNetworkBlockedTrue(t *testing.T) {
+	e := newEnv(t)
+	c := e.initialized(t)
+
+	var rf struct {
+		ID string `json:"id"`
+	}
+	c.do("POST", "/api/ringfences", map[string]string{"name": "Office"}, &rf)
+	if code := c.do("POST", "/api/ringfences/"+rf.ID+"/programs",
+		map[string]any{"path": `C:\a.exe`}, nil); code != 201 {
+		t.Fatalf("add program = %d", code)
+	}
+
+	var detail struct {
+		Programs []struct {
+			NetworkBlocked bool `json:"network_blocked"`
+		} `json:"programs"`
+	}
+	c.do("GET", "/api/ringfences/"+rf.ID, nil, &detail)
+	if len(detail.Programs) != 1 || !detail.Programs[0].NetworkBlocked {
+		t.Fatalf("programs = %+v, want network_blocked defaulted to true", detail.Programs)
+	}
+}
+
+// TestUnassignRingfenceRequiresMatchingRingfenceID covers FINDING 3: an
+// admin viewing ringfence A must not be able to detach ringfence B from a
+// group that is actually assigned to B, by unassigning through A's page. The
+// server is authoritative on what is currently assigned, not the client.
+func TestUnassignRingfenceRequiresMatchingRingfenceID(t *testing.T) {
+	e := newEnv(t)
+	c := e.initialized(t)
+
+	var rfA, rfB struct {
+		ID string `json:"id"`
+	}
+	c.do("POST", "/api/ringfences", map[string]string{"name": "A"}, &rfA)
+	c.do("POST", "/api/ringfences", map[string]string{"name": "B"}, &rfB)
+
+	var grp struct {
+		ID string `json:"id"`
+	}
+	c.do("POST", "/api/groups", map[string]string{"name": "WS"}, &grp)
+
+	// Group is actually assigned to B.
+	if code := c.do("POST", "/api/ringfences/"+rfB.ID+"/assign", map[string]string{"group_id": grp.ID}, nil); code != 204 {
+		t.Fatalf("assign B = %d", code)
+	}
+
+	// No ringfence_id at all: rejected outright, not a silent detach.
+	if code := c.do("DELETE", "/api/groups/"+grp.ID+"/ringfence", nil, nil); code != 400 {
+		t.Errorf("unassign without ringfence_id = %d, want 400", code)
+	}
+
+	// Caller believes (wrongly) that A is assigned: must be refused with 409,
+	// and B must remain assigned afterward.
+	if code := c.do("DELETE", "/api/groups/"+grp.ID+"/ringfence?ringfence_id="+rfA.ID, nil, nil); code != 409 {
+		t.Errorf("unassign with mismatched ringfence_id = %d, want 409", code)
+	}
+
+	// The correct ringfence_id (B) succeeds.
+	if code := c.do("DELETE", "/api/groups/"+grp.ID+"/ringfence?ringfence_id="+rfB.ID, nil, nil); code != 204 {
+		t.Errorf("unassign with matching ringfence_id = %d, want 204", code)
+	}
+}
+
+// TestListRingfenceEventsDeviceIDFilter covers FINDING 4's HTTP surface: a
+// bad device_id is a 400, and a well-formed one is accepted and passed
+// through (the filtering logic itself is covered store-side in
+// TestRingfenceEventsFilterByDevice).
+func TestListRingfenceEventsDeviceIDFilter(t *testing.T) {
+	e := newEnv(t)
+	c := e.initialized(t)
+
+	if code := c.do("GET", "/api/ringfence-events?device_id=not-a-uuid", nil, nil); code != 400 {
+		t.Errorf("bad device_id = %d, want 400", code)
+	}
+	if code := c.do("GET", "/api/ringfence-events?device_id="+uuid.NewString(), nil, nil); code != 200 {
+		t.Errorf("well-formed device_id = %d, want 200", code)
 	}
 }
