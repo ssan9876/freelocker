@@ -23,6 +23,11 @@ import { useTheme } from "./util";
 
 type NavItem = { to: string; label: string; icon: ComponentType<{ className?: string }> };
 
+// Labels use the module vocabulary this product category has settled on --
+// Application Control, Ringfencing, Unified Audit -- so an operator arriving
+// from a comparable tool already knows what each section does. Routes are
+// unchanged, so existing links keep working.
+//
 // Grouped so the sidebar has a shape. Ungrouped, thirteen destinations read
 // as one undifferentiated list where everything looks equally important.
 // The order follows how the console is actually used: watch the fleet, then
@@ -41,8 +46,8 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Control",
     items: [
-      { to: "/policies", label: "Policies", icon: IconPolicies },
-      { to: "/ringfences", label: "Ringfences", icon: IconRingfence },
+      { to: "/policies", label: "Application Control", icon: IconPolicies },
+      { to: "/ringfences", label: "Ringfencing", icon: IconRingfence },
       { to: "/groups", label: "Groups", icon: IconGroups },
     ],
   },
@@ -53,7 +58,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: "/tokens", label: "Install tokens", icon: IconTokens },
       { to: "/admins", label: "Admins", icon: IconAdmins },
       { to: "/releases", label: "Agent releases", icon: IconReleases },
-      { to: "/audit", label: "Audit log", icon: IconAudit },
+      { to: "/audit", label: "Unified Audit", icon: IconAudit },
     ],
   },
 ];

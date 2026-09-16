@@ -28,7 +28,7 @@ export function Audit() {
   return (
     <div>
       <div className="page-head">
-        <h1>Audit log</h1>
+        <h1>Unified Audit</h1>
         <ExportButton resource="audit" />
       </div>
       <div className="table-wrap">

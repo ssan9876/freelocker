@@ -42,7 +42,7 @@ export function Ringfences() {
   return (
     <div>
       <div className="page-head">
-        <h1>Ringfences</h1>
+        <h1>Ringfencing</h1>
       </div>
       <div className="panel" style={{ marginBottom: 20 }}>
         <p className="who" style={{ marginTop: 0, marginBottom: 10 }}>

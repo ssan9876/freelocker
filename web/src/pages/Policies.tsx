@@ -49,7 +49,7 @@ export function Policies() {
   return (
     <div>
       <div className="page-head">
-        <h1>Policies</h1>
+        <h1>Application Control</h1>
       </div>
       <div className="panel" style={{ marginBottom: 20 }}>
         <p className="who" style={{ marginTop: 0, marginBottom: 10 }}>

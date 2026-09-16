@@ -131,11 +131,11 @@ test("first-run setup, sign in with MFA, manage groups, rules and admins", async
   await page.getByLabel("Delete Dead hook").click();
   await expect(page.getByText("No channels yet.")).toBeVisible();
 
-  // Ringfences: create, confirm it starts in audit, add a program, set one
+  // Ringfencing: create, confirm it starts in audit, add a program, set one
   // ASR protection to audit, switch to enforce via the confirmation dialog,
   // then delete it and confirm it is gone from the list.
-  await page.getByRole("link", { name: "Ringfences" }).click();
-  await expect(page.getByRole("heading", { name: "Ringfences" })).toBeVisible();
+  await page.getByRole("link", { name: "Ringfencing" }).click();
+  await expect(page.getByRole("heading", { name: "Ringfencing" })).toBeVisible();
   await page.getByLabel("Ringfence name").fill("Office apps");
   await page.getByRole("button", { name: "Create ringfence" }).click();
   // The ringfence name in the list is a plain <a onClick> with no href, so
@@ -163,6 +163,6 @@ test("first-run setup, sign in with MFA, manage groups, rules and admins", async
   await page.getByRole("button", { name: "Delete ringfence" }).click();
   await expect(page.getByRole("heading", { name: "Delete ringfence" })).toBeVisible();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Ringfences" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ringfencing" })).toBeVisible();
   await expect(page.getByText("Office apps", { exact: true })).toHaveCount(0);
 });

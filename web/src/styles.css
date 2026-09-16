@@ -6,9 +6,15 @@
  * whitespace, and colour reserved almost entirely for severity — if
  * everything is coloured, nothing reads as urgent.
  *
- * The accent is FreeLocker's own green. Severity colours are deliberately NOT
- * the accent, so "this is a FreeLocker control" and "this is on fire" never
- * look alike.
+ * Amber accent on near-black chrome, the established look of this product
+ * category, so operators coming from a comparable tool are not relearning
+ * where to look. Severity colours are deliberately NOT the accent, so "this
+ * is a control" and "this is on fire" never look alike -- which is also why
+ * the accent is not red or green.
+ *
+ * The sidebar and topbar sit on --chrome, darker than the content they frame
+ * in dark mode and dark even in light mode, so the data is what the eye lands
+ * on first.
  */
 
 :root {
@@ -24,10 +30,18 @@
   --ink-soft: #33465a;
   --muted: #5c7085;
 
-  --accent: #10855a;
+  --accent: #b06d00;
   --accent-ink: #ffffff;
-  --accent-soft: rgba(16, 133, 90, 0.12);
-  --accent-line: rgba(16, 133, 90, 0.45);
+  --accent-soft: rgba(176, 109, 0, 0.13);
+  --accent-line: rgba(176, 109, 0, 0.45);
+  --chrome: #10161f;
+  --chrome-border: #1d2530;
+  /* The chrome stays dark in light mode, so its text cannot come from the
+     light palette: --ink there is near-black and would vanish. */
+  --chrome-ink: #eef2f7;
+  --chrome-ink-soft: #c3ccd8;
+  --chrome-muted: #8d99a8;
+  --chrome-hover: #1b2430;
 
   --online: #12875a;
   --warn: #9a6200;
@@ -49,20 +63,31 @@
   /* Slate rather than pure black: large areas of #000 make thin borders and
      small text harder to place, and a fleet console is mostly borders and
      small text. */
-  --paper: #080d12;
-  --surface: #0e161d;
-  --surface-2: #141f28;
-  --surface-3: #1b2833;
-  --border: #1e2c37;
-  --border-strong: #2c3f4e;
-  --ink: #dbe6ef;
-  --ink-soft: #aebecd;
-  --muted: #7b8fa1;
+  --paper: #0b0e13;
+  --surface: #12161d;
+  --surface-2: #1a1f28;
+  --surface-3: #232935;
+  --border: #252b36;
+  --border-strong: #363e4d;
+  --ink: #e2e7ee;
+  --ink-soft: #b3bcc9;
+  --muted: #828c9c;
 
-  --accent: #2fc389;
-  --accent-ink: #04170f;
-  --accent-soft: rgba(47, 195, 137, 0.14);
-  --accent-line: rgba(47, 195, 137, 0.55);
+  /* Amber on near-black: the signature of this product category, and it
+     leaves green free to mean "healthy" rather than "brand". */
+  --accent: #f59f0b;
+  --accent-ink: #1a1203;
+  --accent-soft: rgba(245, 159, 11, 0.14);
+  --accent-line: rgba(245, 159, 11, 0.5);
+
+  /* The chrome is darker than the content it frames, so the data is what
+     the eye lands on first. */
+  --chrome: #070a0e;
+  --chrome-border: #1d232c;
+  --chrome-ink: #e6ebf2;
+  --chrome-ink-soft: #b3bcc9;
+  --chrome-muted: #828c9c;
+  --chrome-hover: #141a22;
 
   --online: #35c98c;
   --warn: #d2a03a;
@@ -84,10 +109,18 @@
   --ink: #0d1721;
   --ink-soft: #33465a;
   --muted: #5c7085;
-  --accent: #10855a;
+  --accent: #b06d00;
   --accent-ink: #ffffff;
-  --accent-soft: rgba(16, 133, 90, 0.12);
-  --accent-line: rgba(16, 133, 90, 0.45);
+  --accent-soft: rgba(176, 109, 0, 0.13);
+  --accent-line: rgba(176, 109, 0, 0.45);
+  --chrome: #10161f;
+  --chrome-border: #1d2530;
+  /* The chrome stays dark in light mode, so its text cannot come from the
+     light palette: --ink there is near-black and would vanish. */
+  --chrome-ink: #eef2f7;
+  --chrome-ink-soft: #c3ccd8;
+  --chrome-muted: #8d99a8;
+  --chrome-hover: #1b2430;
   --online: #12875a;
   --warn: #9a6200;
   --danger: #b4202f;
@@ -205,15 +238,15 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .shell { display: grid; grid-template-columns: 236px 1fr; height: 100%; }
 
 .sidebar {
-  background: var(--surface);
-  border-right: 1px solid var(--border);
+  background: var(--chrome);
+  border-right: 1px solid var(--chrome-border);
   padding: 16px 10px 20px;
   display: flex;
   flex-direction: column;
   gap: 1px;
   overflow-y: auto;
 }
-.sidebar .brand { padding: 2px 10px 16px; }
+.sidebar .brand { padding: 2px 10px 16px; color: var(--chrome-ink); }
 
 /* Section labels give the thirteen destinations a shape. Without them the
    sidebar is an undifferentiated list and everything looks equally
@@ -223,7 +256,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--chrome-muted);
   padding: 15px 10px 5px;
 }
 
@@ -233,12 +266,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   gap: 9px;
   padding: 7px 10px;
   border-radius: var(--radius-sm);
-  color: var(--ink-soft);
+  color: var(--chrome-ink-soft);
   font-weight: 500;
   font-size: 13.5px;
   position: relative;
 }
-.nav-item:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+.nav-item:hover { background: var(--chrome-hover); color: var(--chrome-ink); text-decoration: none; }
 .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 /* The active marker sits in the gutter rather than being an inset shadow, so
    it survives the rounded corner cleanly. */
@@ -266,19 +299,29 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   padding: 0 22px;
   height: 54px;
   flex: none;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  border-bottom: 1px solid var(--chrome-border);
+  background: var(--chrome);
 }
-.topbar .who b { color: var(--ink); font-weight: 600; }
+.topbar .who { color: var(--chrome-muted); }
+.topbar .who b { color: var(--chrome-ink); font-weight: 600; }
+
+/* Controls sitting on the chrome need its foreground, not the page's. In
+   light mode the page ink is near-black and would disappear here. */
+.topbar button, .topbar a.button {
+  color: var(--chrome-ink);
+  background: transparent;
+  border-color: var(--chrome-border);
+}
+.topbar button:hover, .topbar a.button:hover { background: var(--chrome-hover); }
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 .account {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 4px 11px 4px 4px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--chrome-border);
   border-radius: 999px;
-  background: var(--surface-2);
+  background: var(--chrome-hover);
 }
 .avatar {
   width: 25px; height: 25px; border-radius: 50%;
