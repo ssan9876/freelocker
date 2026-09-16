@@ -14,8 +14,12 @@ type evtData struct {
 }
 
 type evt struct {
-	EventID int       `xml:"System>EventID"`
-	Data    []evtData `xml:"EventData>Data"`
+	EventID     int   `xml:"System>EventID"`
+	RecordID    int64 `xml:"System>EventRecordID"`
+	TimeCreated struct {
+		SystemTime string `xml:"SystemTime,attr"`
+	} `xml:"System>TimeCreated"`
+	Data []evtData `xml:"EventData>Data"`
 }
 
 type evtList struct {
@@ -43,6 +47,56 @@ func parseEvents(raw []byte) ([]evt, error) {
 		return nil, fmt.Errorf("parse event xml: %w", err)
 	}
 	return l.Events, nil
+}
+
+// eventTime parses the SystemTime attribute of <TimeCreated>, which Windows
+// event XML always renders in RFC3339-with-fractional-seconds form. A
+// missing or unparseable value falls back to time.Now rather than failing
+// the whole batch — a timestamp we cannot trust is still better reported
+// approximately than dropped.
+func eventTime(raw string) time.Time {
+	if raw == "" {
+		return time.Now()
+	}
+	if t, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		return t
+	}
+	return time.Now()
+}
+
+// EventQuery builds the wevtutil XPath filter for one or more event IDs,
+// optionally bounded to records newer than a watermark. afterRecordID <= 0
+// means no lower bound — the first run against a source, which is
+// deliberately NOT "replay the whole log": the caller still bounds the
+// query with /c:N, so this only ever returns the most recent batch.
+func EventQuery(eventIDs []int, afterRecordID int64) string {
+	parts := make([]string, len(eventIDs))
+	for i, id := range eventIDs {
+		parts[i] = fmt.Sprintf("EventID=%d", id)
+	}
+	idExpr := strings.Join(parts, " or ")
+	if afterRecordID > 0 {
+		return fmt.Sprintf("*[System[(%s) and (EventRecordID>%d)]]", idExpr, afterRecordID)
+	}
+	return fmt.Sprintf("*[System[(%s)]]", idExpr)
+}
+
+// MaxRecordID returns the highest EventRecordID among all events in raw,
+// regardless of whether ParseWFP/ParseDefenderASR keep or drop them — the
+// watermark must advance past events dropped for not matching a ringfenced
+// program too, or they would be re-fetched on every tick forever.
+func MaxRecordID(raw []byte) (int64, error) {
+	evts, err := parseEvents(raw)
+	if err != nil {
+		return 0, err
+	}
+	var max int64
+	for _, e := range evts {
+		if e.RecordID > max {
+			max = e.RecordID
+		}
+	}
+	return max, nil
 }
 
 var devicePath = regexp.MustCompile(`^\\device\\harddiskvolume\d+`)
@@ -93,7 +147,7 @@ func ParseWFP(raw []byte, ringfenced map[string]bool) ([]Violation, error) {
 			Program:  matched,
 			Detail:   e.field("DestAddress") + ":" + e.field("DestPort"),
 			Enforced: e.EventID == 5157,
-			At:       time.Now(),
+			At:       eventTime(e.TimeCreated.SystemTime),
 		})
 	}
 	return out, nil
@@ -116,7 +170,7 @@ func ParseDefenderASR(raw []byte) ([]Violation, error) {
 			Program:  e.field("Path"),
 			Detail:   "ASR " + e.field("ID") + ": " + e.field("ProcessName"),
 			Enforced: e.EventID == 1121,
-			At:       time.Now(),
+			At:       eventTime(e.TimeCreated.SystemTime),
 		})
 	}
 	return out, nil

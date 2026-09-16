@@ -11,12 +11,56 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"time"
 )
 
 // RulePrefix names every firewall rule this package owns, so reconcile can
 // enumerate exactly ours and never touch a rule an admin added by hand.
 const RulePrefix = "FreeLocker-RF-"
+
+// CuratedASRRules is the fixed set of ASR rule GUIDs FreeLocker manages,
+// mirroring asrRules in internal/server/httpapi/ringfences.go (the agent
+// cannot import the server package, so the set is duplicated here). Keys are
+// upper-case GUIDs.
+//
+// This is the authority for what the enforcer is ever allowed to delete from
+// the Defender machine-policy ASR key: an endpoint's ASR rules may also be
+// managed by GPO or Intune in the same registry key, and deleting a value
+// this product never wrote would silently strip that unrelated
+// configuration. See StaleASRValues.
+var CuratedASRRules = map[string]bool{
+	"D4F940AB-401B-4EFC-AADC-AD5F3C50688A": true,
+	"3B576869-A4EC-4529-8536-B80A7769E899": true,
+	"D3E037E1-3EB8-44C8-A917-57927947596D": true,
+	"5BEB7EFE-FD9A-4556-801D-275E5FFC04CC": true,
+	"92E97FA1-2EDF-4476-BDD6-9DD0B4DDDC7B": true,
+	"D1E49AAC-8F56-4280-B9BA-993A6D77406C": true,
+}
+
+// StaleASRValues returns the subset of `present` (value names currently in
+// the Defender ASR policy key) that this package is both allowed to delete
+// (member of CuratedASRRules) and no longer wants (absent from `want`, whose
+// keys must be upper-case GUIDs). Comparison against CuratedASRRules and
+// `want` is case-insensitive on `present` since GUIDs may be stored in
+// either case; the values returned are exactly as they appear in `present`,
+// so the caller can delete them by that name.
+//
+// This is deliberately pure and platform-independent so the deletion
+// boundary can be unit-tested without touching the Windows registry.
+func StaleASRValues(present []string, want map[string]string) []string {
+	var stale []string
+	for _, n := range present {
+		u := strings.ToUpper(n)
+		if !CuratedASRRules[u] {
+			continue // never ours to delete: GPO/Intune or unrelated
+		}
+		if _, ok := want[u]; !ok {
+			stale = append(stale, n)
+		}
+	}
+	return stale
+}
 
 type Program struct {
 	Path           string

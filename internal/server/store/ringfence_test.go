@@ -179,7 +179,7 @@ func TestRingfenceEvents(t *testing.T) {
 	if err := s.AppendRingfenceEvents(ctx, tenant, dev, evs); err != nil {
 		t.Fatal(err)
 	}
-	got, err := s.ListRingfenceEvents(ctx, tenant, 10)
+	got, err := s.ListRingfenceEvents(ctx, tenant, 10, nil)
 	if err != nil || len(got) != 2 {
 		t.Fatalf("list = %+v, %v", got, err)
 	}
@@ -194,7 +194,43 @@ func TestRingfenceEvents(t *testing.T) {
 
 	// Another tenant sees none of it.
 	other, _ := s.CreateTenant(ctx, "Beta")
-	if got, _ := s.ListRingfenceEvents(ctx, other, 10); len(got) != 0 {
+	if got, _ := s.ListRingfenceEvents(ctx, other, 10, nil); len(got) != 0 {
 		t.Errorf("cross-tenant list = %+v", got)
+	}
+}
+
+// TestRingfenceEventsFilterByDevice covers FINDING 4: on a tenant with
+// several devices, the console needs a server-side device_id filter — the
+// tenant-wide feed is capped, and client-side filtering after the fact can
+// silently show "no activity" for a device that actually has violations
+// buried past the cap.
+func TestRingfenceEventsFilterByDevice(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	devA := enrollTestDevice(t, s, tenant, nil, "pc-a", "1.0.0")
+	devB := enrollTestDevice(t, s, tenant, nil, "pc-b", "1.0.0")
+
+	if err := s.AppendRingfenceEvents(ctx, tenant, devA, []store.RingfenceEvent{
+		{Kind: "network", Program: `C:\a.exe`, Detail: "203.0.113.5:443", At: time.Now()},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AppendRingfenceEvents(ctx, tenant, devB, []store.RingfenceEvent{
+		{Kind: "network", Program: `C:\b.exe`, Detail: "203.0.113.6:443", At: time.Now()},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.ListRingfenceEvents(ctx, tenant, 10, &devA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].DeviceID != devA {
+		t.Fatalf("ListRingfenceEvents(deviceID=A) = %+v, want exactly devA's event", got)
+	}
+
+	if got, _ := s.ListRingfenceEvents(ctx, tenant, 10, nil); len(got) != 2 {
+		t.Errorf("ListRingfenceEvents(nil) = %+v, want both events (unfiltered)", got)
 	}
 }

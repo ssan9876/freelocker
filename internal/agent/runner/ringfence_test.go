@@ -142,7 +142,7 @@ func TestRunnerAppliesRingfenceAndReportsViolations(t *testing.T) {
 	})
 
 	eventually(t, "violation reported to store", func() bool {
-		evs, err := a.Store().ListRingfenceEvents(ctx, tenant, 10)
+		evs, err := a.Store().ListRingfenceEvents(ctx, tenant, 10, nil)
 		if err != nil {
 			return false
 		}

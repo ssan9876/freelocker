@@ -104,7 +104,7 @@ func TestRingfenceOverTheWire(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	evs, err := s.ListRingfenceEvents(ctx, tenant, 10)
+	evs, err := s.ListRingfenceEvents(ctx, tenant, 10, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

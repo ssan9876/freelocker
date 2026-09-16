@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseWFPKeepsOnlyRingfencedPrograms(t *testing.T) {
@@ -110,6 +111,108 @@ func TestParseDefenderASR(t *testing.T) {
 	}
 	if got[0].Kind != "child_process" || !got[0].Enforced {
 		t.Errorf("1121 is a block: %+v", got[0])
+	}
+}
+
+func TestParseWFPUsesRealEventTimestamp(t *testing.T) {
+	// The fixture's first event carries TimeCreated SystemTime=
+	// "2026-09-15T14:02:11.1234567Z" — the violation must carry that, not
+	// wall-clock now, so the server can deduplicate/bookmark on it.
+	raw, err := os.ReadFile("testdata/wfp_5156.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ringfenced := map[string]bool{`c:\program files\app\app.exe`: true}
+	got, err := ParseWFP(raw, ringfenced)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("got %d violations, want 1", len(got))
+	}
+	want, err := time.Parse(time.RFC3339Nano, "2026-09-15T14:02:11.1234567Z")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got[0].At.Equal(want) {
+		t.Errorf("At = %v, want the event's real TimeCreated %v (not time.Now)", got[0].At, want)
+	}
+}
+
+func TestParseWFPFallsBackToNowWhenTimestampMissing(t *testing.T) {
+	before := time.Now()
+	raw := []byte(`<Events><Event><System><EventID>5156</EventID></System><EventData>` +
+		`<Data Name="Application">\device\harddiskvolume3\program files\app\app.exe</Data>` +
+		`<Data Name="DestAddress">203.0.113.5</Data><Data Name="DestPort">443</Data>` +
+		`</EventData></Event></Events>`)
+	got, err := ParseWFP(raw, map[string]bool{`c:\program files\app\app.exe`: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("got %d violations, want 1", len(got))
+	}
+	after := time.Now()
+	if got[0].At.Before(before) || got[0].At.After(after) {
+		t.Errorf("At = %v, want a fallback to time.Now() in [%v, %v] when TimeCreated is absent", got[0].At, before, after)
+	}
+}
+
+func TestEventQueryNoWatermarkOnFirstRun(t *testing.T) {
+	got := EventQuery([]int{5157}, 0)
+	want := "*[System[(EventID=5157)]]"
+	if got != want {
+		t.Errorf("EventQuery(no watermark) = %q, want %q", got, want)
+	}
+}
+
+func TestEventQueryWithWatermarkFiltersByRecordID(t *testing.T) {
+	got := EventQuery([]int{1121, 1122}, 918273)
+	want := "*[System[(EventID=1121 or EventID=1122) and (EventRecordID>918273)]]"
+	if got != want {
+		t.Errorf("EventQuery(watermark) = %q, want %q", got, want)
+	}
+}
+
+func TestMaxRecordIDAdvancesPastDroppedEvents(t *testing.T) {
+	// Both events in the fixture are 5156 events, but only app.exe is
+	// ringfenced; chrome.exe is dropped by ParseWFP. MaxRecordID must still
+	// report the record id of the chrome.exe event (918290) or the watermark
+	// would never advance past events for programs outside the ringfence.
+	raw, err := os.ReadFile("testdata/wfp_5156.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := MaxRecordID(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 918290 {
+		t.Errorf("MaxRecordID = %d, want 918290 (the higher of the two fixture events, including the dropped one)", got)
+	}
+}
+
+func TestStaleASRValuesOnlyDeletesCuratedGUIDsNoLongerWanted(t *testing.T) {
+	// A GPO/Intune-managed GUID outside the curated set must survive even
+	// though it is not in `want` — this is the FINDING 1 regression: the old
+	// code deleted every value name under the key, wiping org-wide policy.
+	const curatedNoLongerWanted = "D4F940AB-401B-4EFC-AADC-AD5F3C50688A"
+	const curatedStillWanted = "3B576869-A4EC-4529-8536-B80A7769E899"
+	const gpoManagedUnrelated = "26190899-1602-49E8-8B27-EB1D0A1CE869" // not in CuratedASRRules
+	present := []string{curatedNoLongerWanted, curatedStillWanted, gpoManagedUnrelated}
+	want := map[string]string{curatedStillWanted: "block"}
+
+	got := StaleASRValues(present, want)
+	if len(got) != 1 || got[0] != curatedNoLongerWanted {
+		t.Fatalf("StaleASRValues = %v, want exactly [%s]", got, curatedNoLongerWanted)
+	}
+}
+
+func TestStaleASRValuesIsCaseInsensitive(t *testing.T) {
+	lower := "d4f940ab-401b-4efc-aadc-ad5f3c50688a"
+	got := StaleASRValues([]string{lower}, map[string]string{})
+	if len(got) != 1 || got[0] != lower {
+		t.Fatalf("StaleASRValues(lower-case curated GUID) = %v, want it flagged stale (case-insensitive match)", got)
 	}
 }
 

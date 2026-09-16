@@ -5,14 +5,23 @@ package ringfence
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/sys/windows/registry"
 )
 
 const asrKey = `SOFTWARE\Policies\Microsoft\Windows Defender\Windows Defender Exploit Guard\ASR\Rules`
+
+// defenderStatusTTL caps how often Status() shells out to PowerShell to ask
+// Defender whether it is active. The runner calls Status() every
+// app-control tick on every device, including devices with no ringfence at
+// all, and Defender's real-time-protection state rarely changes, so a fresh
+// process per tick buys nothing but cost.
+const defenderStatusTTL = 3 * time.Minute
 
 // WinEnforcer applies ringfences with netsh firewall rules and ASR machine
 // policy. Both are reversible: rules are removed and values deleted.
@@ -24,6 +33,17 @@ type WinEnforcer struct {
 	mu      sync.Mutex
 	applied string
 	last    Ringfence
+
+	// secRecordID/defRecordID are per-source watermarks (the Windows event
+	// RecordId), so Violations only ever asks wevtutil for records newer
+	// than the highest one already seen, instead of re-reading and
+	// re-reporting the same events every tick.
+	secRecordID int64
+	defRecordID int64
+
+	// defenderCache/defenderCachedAt back Status()'s TTL cache.
+	defenderCache    bool
+	defenderCachedAt time.Time
 }
 
 func Default(agentImages []string) Enforcer {
@@ -69,7 +89,13 @@ func (e *WinEnforcer) applyNetwork(r Ringfence) error {
 	}
 	add, remove := Diff(e.existingRules(), desired)
 	for _, name := range remove {
-		netsh("advfirewall", "firewall", "delete", "rule", "name="+name)
+		// Unlike the historical netsh() fire-and-forget, a delete failure
+		// here is logged: silently leaving a stale block/allow rule in
+		// place on unassign is exactly the kind of residue the ASR side was
+		// fixed to report loudly, and the firewall side should not be worse.
+		if err := netshErr("advfirewall", "firewall", "delete", "rule", "name="+name); err != nil {
+			slog.Error("ringfence: failed to delete firewall rule", "rule", name, "err", err)
+		}
 	}
 	for _, p := range add {
 		if err := netshErr("advfirewall", "firewall", "add", "rule",
@@ -108,20 +134,22 @@ func (e *WinEnforcer) applyASR(r Ringfence) error {
 	for _, p := range r.Protections {
 		want[strings.ToUpper(p.ASRRule)] = p.Action
 	}
-	// Remove values we previously set that are no longer wanted. Errors here
-	// are not ignored: a value that fails to delete (or a names list that
-	// fails to read) leaves a stale ASR policy enforcing on the endpoint
-	// after the ringfence is unassigned, silently breaking the reversibility
-	// guarantee.
+	// Remove values FreeLocker owns (CuratedASRRules — the same six GUIDs
+	// the server accepts) that are no longer wanted. This key is also where
+	// GPO and Intune write ASR policy, so it is NOT safe to delete every
+	// value name that isn't in `want`: doing so silently strips org-wide ASR
+	// configuration the first time an admin assigns a ringfence with no
+	// protections. Errors here are not ignored: a value that fails to
+	// delete (or a names list that fails to read) leaves a stale ASR policy
+	// enforcing on the endpoint after the ringfence is unassigned, silently
+	// breaking the reversibility guarantee.
 	names, err := k.ReadValueNames(0)
 	if err != nil {
 		return fmt.Errorf("read ASR policy values: %w", err)
 	}
-	for _, n := range names {
-		if _, ok := want[strings.ToUpper(n)]; !ok {
-			if err := k.DeleteValue(n); err != nil {
-				return fmt.Errorf("remove stale ASR %s: %w", n, err)
-			}
+	for _, n := range StaleASRValues(names, want) {
+		if err := k.DeleteValue(n); err != nil {
+			return fmt.Errorf("remove stale ASR %s: %w", n, err)
 		}
 	}
 	for guid, action := range want {
@@ -136,12 +164,16 @@ func (e *WinEnforcer) applyASR(r Ringfence) error {
 	return nil
 }
 
-// Violations reads both sources. Which WFP event id matters depends on mode:
-// enforce produces 5157 (blocked), audit produces 5156 (allowed, would have
-// been blocked).
+// Violations reads both sources, bounded to records newer than the
+// per-source watermark (secRecordID/defRecordID) so the same events are not
+// re-read and re-reported on every tick — see EventQuery/MaxRecordID.
+// Which WFP event id matters depends on mode: enforce produces 5157
+// (blocked), audit produces 5156 (allowed, would have been blocked).
 func (e *WinEnforcer) Violations(_ context.Context) ([]Violation, error) {
 	e.mu.Lock()
 	last := e.last
+	secWM := e.secRecordID
+	defWM := e.defRecordID
 	e.mu.Unlock()
 	if last.Version == "" {
 		return nil, nil
@@ -152,30 +184,47 @@ func (e *WinEnforcer) Violations(_ context.Context) ([]Violation, error) {
 			set[strings.ToLower(p.Path)] = true
 		}
 	}
-	id := "5156"
+	wfpID := 5156
 	if last.Mode == "enforce" {
-		id = "5157"
+		wfpID = 5157
 	}
 	var out []Violation
 	if raw, err := exec.Command("wevtutil", "qe", "Security",
-		"/q:*[System[(EventID="+id+")]]", "/c:500", "/rd:true", "/f:xml").Output(); err == nil {
+		"/q:"+EventQuery([]int{wfpID}, secWM), "/c:500", "/rd:true", "/f:xml").Output(); err == nil {
 		if v, err := ParseWFP(raw, set); err == nil {
 			out = append(out, v...)
 		}
+		// The watermark advances past every record in the batch, including
+		// ones ParseWFP dropped for not matching a ringfenced program —
+		// otherwise those would be re-fetched forever.
+		if m, err := MaxRecordID(raw); err == nil && m > secWM {
+			secWM = m
+		}
 	}
 	if raw, err := exec.Command("wevtutil", "qe", "Microsoft-Windows-Windows Defender/Operational",
-		"/q:*[System[(EventID=1121 or EventID=1122)]]", "/c:200", "/rd:true", "/f:xml").Output(); err == nil {
+		"/q:"+EventQuery([]int{1121, 1122}, defWM), "/c:200", "/rd:true", "/f:xml").Output(); err == nil {
 		if v, err := ParseDefenderASR(raw); err == nil {
 			out = append(out, v...)
 		}
+		if m, err := MaxRecordID(raw); err == nil && m > defWM {
+			defWM = m
+		}
 	}
+	e.mu.Lock()
+	e.secRecordID = secWM
+	e.defRecordID = defWM
+	e.mu.Unlock()
 	return Dedupe(out, 200), nil
 }
 
 func (e *WinEnforcer) Status() Status {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return Status{Applied: e.applied, ASRAvailable: defenderActive()}
+	if time.Since(e.defenderCachedAt) > defenderStatusTTL {
+		e.defenderCache = defenderActive()
+		e.defenderCachedAt = time.Now()
+	}
+	return Status{Applied: e.applied, ASRAvailable: e.defenderCache}
 }
 
 // defenderActive reports whether Defender real-time protection is on, which
@@ -189,8 +238,6 @@ func defenderActive() bool {
 	}
 	return strings.EqualFold(strings.TrimSpace(string(out)), "True")
 }
-
-func netsh(args ...string) { exec.Command("netsh", args...).Run() }
 
 func netshErr(args ...string) error {
 	out, err := exec.Command("netsh", args...).CombinedOutput()
