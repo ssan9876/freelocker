@@ -28,6 +28,10 @@ type deviceJSON struct {
 	LastSeenAt    *time.Time `json:"last_seen_at"`
 	CertExpiresAt time.Time  `json:"cert_expires_at"`
 	EnrolledAt    time.Time  `json:"enrolled_at"`
+	// ASRAvailable is nil when the device has never reported a ringfence
+	// status, so the console can tell "not yet reported" apart from a
+	// reported false ("not enforced -- Defender inactive").
+	ASRAvailable *bool `json:"asr_available"`
 }
 
 func (a *API) toDeviceJSON(d store.Device, now time.Time) deviceJSON {
@@ -35,7 +39,7 @@ func (a *API) toDeviceJSON(d store.Device, now time.Time) deviceJSON {
 		ID: d.ID.String(), Hostname: d.Hostname, Status: d.Status(now), Connected: a.Hub.Connected(d.ID),
 		GroupID: d.GroupID, OSBuild: d.OSBuild, AgentVersion: d.AgentVersion, IPAddresses: d.IPs,
 		LoggedOnUser: d.LoggedOnUser, UptimeSeconds: d.UptimeSeconds, LastSeenAt: d.LastSeenAt,
-		CertExpiresAt: d.CertExpiresAt, EnrolledAt: d.EnrolledAt,
+		CertExpiresAt: d.CertExpiresAt, EnrolledAt: d.EnrolledAt, ASRAvailable: d.ASRAvailable,
 	}
 }
 

@@ -209,4 +209,9 @@ message RingfenceEvent {
 
 message ReportRingfenceEventsRequest {
   repeated RingfenceEvent events = 1;
+  // Whether Defender/ASR was active on the device when this report was
+  // generated. ASR-based protections (e.g. block-office-child-process) are
+  // inert if Defender is not the active anti-virus, so the console needs
+  // this to avoid showing a false green tick.
+  bool asr_available = 2;
 }

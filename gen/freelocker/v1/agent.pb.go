@@ -1865,8 +1865,13 @@ func (x *RingfenceEvent) GetAtUnix() int64 {
 }
 
 type ReportRingfenceEventsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Events        []*RingfenceEvent      `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Events []*RingfenceEvent      `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	// Whether Defender/ASR was active on the device when this report was
+	// generated. ASR-based protections (e.g. block-office-child-process) are
+	// inert if Defender is not the active anti-virus, so the console needs
+	// this to avoid showing a false green tick.
+	AsrAvailable  bool `protobuf:"varint,2,opt,name=asr_available,json=asrAvailable,proto3" json:"asr_available,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1906,6 +1911,13 @@ func (x *ReportRingfenceEventsRequest) GetEvents() []*RingfenceEvent {
 		return x.Events
 	}
 	return nil
+}
+
+func (x *ReportRingfenceEventsRequest) GetAsrAvailable() bool {
+	if x != nil {
+		return x.AsrAvailable
+	}
+	return false
 }
 
 var File_freelocker_v1_agent_proto protoreflect.FileDescriptor
@@ -2029,9 +2041,10 @@ const file_freelocker_v1_agent_proto_rawDesc = "" +
 	"\aprogram\x18\x02 \x01(\tR\aprogram\x12\x16\n" +
 	"\x06detail\x18\x03 \x01(\tR\x06detail\x12\x1a\n" +
 	"\benforced\x18\x04 \x01(\bR\benforced\x12\x17\n" +
-	"\aat_unix\x18\x05 \x01(\x03R\x06atUnix\"U\n" +
+	"\aat_unix\x18\x05 \x01(\x03R\x06atUnix\"z\n" +
 	"\x1cReportRingfenceEventsRequest\x125\n" +
-	"\x06events\x18\x01 \x03(\v2\x1d.freelocker.v1.RingfenceEventR\x06events*\xc6\x01\n" +
+	"\x06events\x18\x01 \x03(\v2\x1d.freelocker.v1.RingfenceEventR\x06events\x12#\n" +
+	"\rasr_available\x18\x02 \x01(\bR\fasrAvailable*\xc6\x01\n" +
 	"\vCommandType\x12\x1c\n" +
 	"\x18COMMAND_TYPE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11COMMAND_TYPE_PING\x10\x01\x12\"\n" +

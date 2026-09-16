@@ -91,6 +91,48 @@ func mustTokens(t *testing.T, s *store.Store, tenant uuid.UUID) []store.InstallT
 	return toks
 }
 
+// TestSetDeviceASRAvailable checks the nullable round trip: a device that
+// has never reported ASR availability reads back nil (distinct from a
+// reported false), and SetDeviceASRAvailable persists true/false per tenant.
+func TestSetDeviceASRAvailable(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	s.CreateInstallToken(ctx, tenant, store.InstallToken{Name: "t"}, []byte("h"))
+	id := uuid.New()
+	s.EnrollDevice(ctx, []byte("h"), time.Now(), func(uuid.UUID) (store.NewDevice, error) { return newDev(id), nil })
+
+	d, err := s.GetDevice(ctx, tenant, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.ASRAvailable != nil {
+		t.Fatalf("ASRAvailable before any report = %v, want nil", d.ASRAvailable)
+	}
+
+	if err := s.SetDeviceASRAvailable(ctx, tenant, id, false); err != nil {
+		t.Fatal(err)
+	}
+	d, err = s.GetDevice(ctx, tenant, id)
+	if err != nil || d.ASRAvailable == nil || *d.ASRAvailable != false {
+		t.Fatalf("ASRAvailable after reporting false = %+v, %v", d.ASRAvailable, err)
+	}
+
+	if err := s.SetDeviceASRAvailable(ctx, tenant, id, true); err != nil {
+		t.Fatal(err)
+	}
+	d, err = s.GetDevice(ctx, tenant, id)
+	if err != nil || d.ASRAvailable == nil || *d.ASRAvailable != true {
+		t.Fatalf("ASRAvailable after reporting true = %+v, %v", d.ASRAvailable, err)
+	}
+
+	// Wrong tenant must not be able to set or see it.
+	otherTenant, _ := s.CreateTenant(ctx, "Other")
+	if err := s.SetDeviceASRAvailable(ctx, otherTenant, id, true); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("SetDeviceASRAvailable across tenants = %v, want ErrNotFound", err)
+	}
+}
+
 func TestHeartbeatStatusRevokeAndCert(t *testing.T) {
 	ctx := context.Background()
 	s := storetest.New(t)

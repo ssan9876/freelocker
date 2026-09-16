@@ -71,6 +71,11 @@ type Runner struct {
 
 	refreshOnce sync.Once
 	refresh     chan struct{}
+
+	// asrReported tracks the last ASR-availability value sent to the
+	// server, so syncRingfence only re-sends it when it changes (nil means
+	// never sent). Only touched from the single app-control goroutine.
+	asrReported *bool
 }
 
 func (r *Runner) refreshCh() chan struct{} {
@@ -280,6 +285,14 @@ func (r *Runner) syncControls(ctx context.Context, client flv1.AgentClient) {
 // re-run reconciliation (firewall rules, ASR policy) every tick; Violations
 // is still polled every tick since it reads live security event logs that
 // change independently of the assigned ringfence's version.
+//
+// It also reports ASR (Defender) availability, which is inert-vs-enforced
+// information the console needs even when there are zero violations to
+// report -- the common case. Sending a report on every tick forever just to
+// carry that one bit would be wasteful, so it only goes out when the value
+// changes from what was last sent (including the first successful tick,
+// since asrReported starts nil) or piggybacks for free on a tick that is
+// already reporting violations.
 func (r *Runner) syncRingfence(ctx context.Context, client flv1.AgentClient) {
 	if r.Ringfence == nil {
 		return
@@ -291,7 +304,8 @@ func (r *Runner) syncRingfence(ctx context.Context, client flv1.AgentClient) {
 		}
 		return
 	}
-	if resp.GetVersion() != r.Ringfence.Status().Applied {
+	st := r.Ringfence.Status()
+	if resp.GetVersion() != st.Applied {
 		desired := ringfence.Ringfence{Version: resp.GetVersion(), Mode: resp.GetMode()}
 		for _, p := range resp.GetPrograms() {
 			desired.Programs = append(desired.Programs, ringfence.Program{Path: p.GetPath(), NetworkBlocked: p.GetNetworkBlocked()})
@@ -302,16 +316,19 @@ func (r *Runner) syncRingfence(ctx context.Context, client flv1.AgentClient) {
 		if err := r.Ringfence.Apply(ctx, desired); err != nil {
 			r.log().Error("apply ringfence", "err", err)
 		}
+		st = r.Ringfence.Status()
 	}
 	vs, err := r.Ringfence.Violations(ctx)
 	if err != nil {
 		r.log().Error("read ringfence violations", "err", err)
 		return
 	}
-	if len(vs) == 0 {
+	asr := st.ASRAvailable
+	report := len(vs) > 0 || r.asrReported == nil || *r.asrReported != asr
+	if !report {
 		return
 	}
-	req := &flv1.ReportRingfenceEventsRequest{}
+	req := &flv1.ReportRingfenceEventsRequest{AsrAvailable: asr}
 	for _, v := range vs {
 		req.Events = append(req.Events, &flv1.RingfenceEvent{
 			Kind: v.Kind, Program: v.Program, Detail: v.Detail, Enforced: v.Enforced, AtUnix: v.At.Unix(),
@@ -319,7 +336,9 @@ func (r *Runner) syncRingfence(ctx context.Context, client flv1.AgentClient) {
 	}
 	if _, err := client.ReportRingfenceEvents(ctx, req); err != nil {
 		r.log().Warn("report ringfence violations", "err", err)
+		return
 	}
+	r.asrReported = &asr
 }
 
 func (r *Runner) syncPolicy(ctx context.Context, client flv1.AgentClient) {

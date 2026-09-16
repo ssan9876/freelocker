@@ -193,6 +193,13 @@ func (s *agentService) ReportRingfenceEvents(ctx context.Context, req *flv1.Repo
 		s.d.Log.Error("append ringfence events", "device", dev.ID, "err", err)
 		return nil, status.Error(codes.Internal, "could not record events")
 	}
+	// ASR availability is recorded for the calling device only -- deviceFrom
+	// comes from the mTLS cert, never the request body -- so one device
+	// cannot report another's Defender state.
+	if err := s.d.Store.SetDeviceASRAvailable(ctx, dev.TenantID, dev.ID, req.GetAsrAvailable()); err != nil {
+		s.d.Log.Error("set device asr available", "device", dev.ID, "err", err)
+		return nil, status.Error(codes.Internal, "could not record events")
+	}
 	return &flv1.Ack{}, nil
 }
 

@@ -285,11 +285,22 @@ export function DeviceDetail() {
       <div className="panel" style={{ marginTop: 20 }}>
         <h2>Ringfence enforcement</h2>
         <p className="who" style={{ marginTop: -8 }}>
-          The console does not yet expose this device's effective ringfence assignment or whether
-          Defender/ASR is available on it — that requires a read endpoint Task 10 did not add. This is the
-          device's recent ringfence activity reported by the agent; "Enforced" means the action was
-          actually blocked, not just logged.
+          The console does not yet expose this device's effective ringfence assignment — that requires a
+          read endpoint this task did not add. This is the device's recent ringfence activity reported by
+          the agent; "Enforced" means the action was actually blocked, not just logged.
         </p>
+        <dl className="facts" style={{ marginBottom: 16 }}>
+          <dt>ASR protections</dt>
+          <dd>
+            {d.asr_available === null ? (
+              <span className="badge role">ASR status not yet reported</span>
+            ) : d.asr_available ? (
+              <span className="badge ok">Enforced — Defender active</span>
+            ) : (
+              <span className="badge fail">Not enforced — Defender inactive</span>
+            )}
+          </dd>
+        </dl>
         {ringfenceEvents.length === 0 ? (
           <div className="empty">No ringfence activity reported for this device yet.</div>
         ) : (

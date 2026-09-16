@@ -39,6 +39,11 @@ type Device struct {
 	CleanShutdown bool
 	Revoked       bool
 	EnrolledAt    time.Time
+	// ASRAvailable reports whether the last ringfence report from this
+	// device said Defender/ASR was active (so ASR-based protections were
+	// really enforced, not silently inert). Nil means the device has never
+	// reported a ringfence, so this is unknown rather than false.
+	ASRAvailable *bool
 }
 
 type Inventory struct {
@@ -66,12 +71,14 @@ func (d Device) Status(now time.Time) string {
 }
 
 const deviceCols = `id, hostname, machine_guid, group_id, cert_serial, cert_expires_at, os_build,
-	agent_version, ips, logged_on_user, uptime_seconds, last_seen_at, clean_shutdown, revoked, enrolled_at`
+	agent_version, ips, logged_on_user, uptime_seconds, last_seen_at, clean_shutdown, revoked, enrolled_at,
+	asr_available`
 
 func scanDevice(r pgx.Row) (Device, error) {
 	var d Device
 	err := r.Scan(&d.ID, &d.Hostname, &d.MachineGUID, &d.GroupID, &d.CertSerial, &d.CertExpiresAt, &d.OSBuild,
-		&d.AgentVersion, &d.IPs, &d.LoggedOnUser, &d.UptimeSeconds, &d.LastSeenAt, &d.CleanShutdown, &d.Revoked, &d.EnrolledAt)
+		&d.AgentVersion, &d.IPs, &d.LoggedOnUser, &d.UptimeSeconds, &d.LastSeenAt, &d.CleanShutdown, &d.Revoked, &d.EnrolledAt,
+		&d.ASRAvailable)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -182,6 +189,15 @@ func (s *Store) RevokeDevice(ctx context.Context, tenantID, id uuid.UUID) error 
 func (s *Store) UpdateDeviceCert(ctx context.Context, tenantID, id uuid.UUID, serial string, expiresAt time.Time) error {
 	return oneRow(s.pool.Exec(ctx, `UPDATE devices SET cert_serial = $3, cert_expires_at = $4 WHERE tenant_id = $1 AND id = $2`,
 		tenantID, id, serial, expiresAt))
+}
+
+// SetDeviceASRAvailable records whether Defender/ASR was active the last
+// time this device reported its ringfence status, so the console can tell
+// an operator "not enforced -- Defender inactive" instead of implying a
+// control is doing something it is not.
+func (s *Store) SetDeviceASRAvailable(ctx context.Context, tenantID, id uuid.UUID, available bool) error {
+	return oneRow(s.pool.Exec(ctx, `UPDATE devices SET asr_available = $3 WHERE tenant_id = $1 AND id = $2`,
+		tenantID, id, available))
 }
 
 // oneRow converts "no rows affected" into ErrNotFound.

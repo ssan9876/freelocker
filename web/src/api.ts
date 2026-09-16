@@ -72,6 +72,10 @@ export type Device = {
   last_seen_at: string | null;
   cert_expires_at: string;
   enrolled_at: string;
+  // Whether Defender/ASR was active as of this device's last ringfence
+  // report. null means the device has never reported one -- distinct from
+  // a reported false ("not enforced -- Defender inactive").
+  asr_available: boolean | null;
 };
 export type DeviceDetail = { device: Device; uninstall_code?: string };
 export type ControlKey = "usb_storage_blocked" | "network_blocked" | "elevation_blocked";

@@ -28,11 +28,12 @@ import (
 // canned violations to report back. It does not dedupe on its own: the
 // runner is responsible for not calling Apply twice with the same version.
 type fakeRingfenceEnforcer struct {
-	mu         sync.Mutex
-	applyCount int
-	applied    ringfence.Ringfence
-	violations []ringfence.Violation
-	sent       bool
+	mu           sync.Mutex
+	applyCount   int
+	applied      ringfence.Ringfence
+	violations   []ringfence.Violation
+	sent         bool
+	asrAvailable bool
 }
 
 func (f *fakeRingfenceEnforcer) Apply(_ context.Context, r ringfence.Ringfence) error {
@@ -56,7 +57,7 @@ func (f *fakeRingfenceEnforcer) Violations(context.Context) ([]ringfence.Violati
 func (f *fakeRingfenceEnforcer) Status() ringfence.Status {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return ringfence.Status{Applied: f.applied.Version}
+	return ringfence.Status{Applied: f.applied.Version, ASRAvailable: f.asrAvailable}
 }
 
 func (f *fakeRingfenceEnforcer) applyCalls() int {
@@ -159,4 +160,60 @@ func TestRunnerAppliesRingfenceAndReportsViolations(t *testing.T) {
 	if calls := enf.applyCalls(); calls != 1 {
 		t.Fatalf("Apply called %d times; want 1 (idempotent on unchanged version)", calls)
 	}
+}
+
+// TestRunnerReportsASRAvailabilityWithoutViolations asserts the defect this
+// task closes: ASR (Defender) availability must reach the server even on
+// ticks with zero violations, which is the common case. A control that
+// silently does nothing must not look identical, server-side, to one the
+// agent never reported on at all.
+func TestRunnerReportsASRAvailabilityWithoutViolations(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	cfg := config.Config{AgentListen: "127.0.0.1:0", PublicHostnames: []string{"127.0.0.1"}, InsecureCookies: true}
+	a, err := app.NewWithStore(cfg, storetest.New(t), bytes.Repeat([]byte{14}, 32), slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(a.Close)
+	if _, err := a.Initialize(ctx, "Acme", "o@example.com", "owner-password-123"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.ActivateForTests(ctx); err != nil {
+		t.Fatal(err)
+	}
+	keys := a.KeysForTest()
+	tenant := keys.TenantID
+
+	full, hash, _ := tokens.Generate(keys.CA.Pin())
+	a.Store().CreateInstallToken(ctx, tenant, store.InstallToken{Name: "t"}, hash)
+
+	dir := t.TempDir()
+	st := &identity.Store{Paths: agentpaths.Paths{InstallDir: dir, DataDir: dir}, Protector: secret.Default()}
+	inv := inventory.New()
+	// No violations at all, and Defender inactive: this is the case Task 13
+	// exists for -- the console must be told "not enforced" rather than
+	// hearing nothing.
+	enf := &fakeRingfenceEnforcer{asrAvailable: false}
+	r := &runner.Runner{
+		ServerURL: a.AgentAddr(), Identity: st, Inventory: inv,
+		Executor:           &executor.Executor{Actions: noopActions{}},
+		HeartbeatInterval:  150 * time.Millisecond,
+		AppControlInterval: 100 * time.Millisecond,
+		Ringfence:          enf,
+	}
+	if err := r.EnsureEnrolled(ctx, full, runner.HardwareInfo(inv)); err != nil {
+		t.Fatal(err)
+	}
+	runCtx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
+	go r.Run(runCtx)
+
+	eventually(t, "device ASRAvailable reported false with no violations", func() bool {
+		devs, err := a.Store().ListDevices(ctx, tenant)
+		if err != nil || len(devs) != 1 {
+			return false
+		}
+		return devs[0].ASRAvailable != nil && *devs[0].ASRAvailable == false
+	})
 }

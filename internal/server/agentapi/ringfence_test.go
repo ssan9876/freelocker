@@ -99,6 +99,7 @@ func TestRingfenceOverTheWire(t *testing.T) {
 			{Kind: "network", Program: path, Detail: "blocked outbound to 10.0.0.1:443", Enforced: true},
 			{Kind: "bogus", Program: path, Detail: "should be skipped"},
 		},
+		AsrAvailable: false,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -115,6 +116,32 @@ func TestRingfenceOverTheWire(t *testing.T) {
 	}
 	if evs[0].Kind != "network" || evs[0].Program != path {
 		t.Errorf("event = %+v, want kind network program %q", evs[0], path)
+	}
+
+	// The device's reported ASR availability must be persisted for the
+	// calling device (identified by its mTLS cert, never a request field),
+	// even though the request also included violations.
+	dev, err := s.GetDevice(ctx, tenant, uuid.MustParse(id.DeviceID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dev.ASRAvailable == nil || *dev.ASRAvailable != false {
+		t.Fatalf("device ASRAvailable = %+v, want false", dev.ASRAvailable)
+	}
+
+	// A second report with AsrAvailable true updates it (ASR toggled on,
+	// e.g. Defender came back into real-time mode).
+	if _, err := flv1.NewAgentClient(conn).ReportRingfenceEvents(cctx, &flv1.ReportRingfenceEventsRequest{
+		AsrAvailable: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	dev, err = s.GetDevice(ctx, tenant, uuid.MustParse(id.DeviceID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dev.ASRAvailable == nil || *dev.ASRAvailable != true {
+		t.Fatalf("device ASRAvailable after second report = %+v, want true", dev.ASRAvailable)
 	}
 }
 
