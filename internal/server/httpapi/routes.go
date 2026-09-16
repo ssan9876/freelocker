@@ -36,6 +36,9 @@ func (a *API) routes(r chi.Router) {
 	r.Get("/api/notifications/status", a.notificationStatus)
 	r.Get("/api/notification-channels", a.listChannels)
 	r.Get("/api/notification-deliveries", a.listDeliveries)
+	r.Get("/api/ringfences", a.listRingfences)
+	r.Get("/api/ringfences/{id}", a.getRingfence)
+	r.Get("/api/ringfence-events", a.listRingfenceEvents)
 
 	r.Group(func(r chi.Router) {
 		r.Use(a.requireRole("admin"))
@@ -71,6 +74,15 @@ func (a *API) routes(r chi.Router) {
 		r.Post("/api/rollouts/{id}/resume", a.transitionRollout("resume", []string{"paused"}, "active"))
 		r.Post("/api/rollouts/{id}/cancel", a.transitionRollout("cancel", []string{"active", "paused"}, "cancelled"))
 		r.Post("/api/rollouts/{id}/rollback", a.rollbackRollout)
+		r.Post("/api/ringfences", a.createRingfence)
+		r.Patch("/api/ringfences/{id}", a.renameRingfence)
+		r.Delete("/api/ringfences/{id}", a.deleteRingfence)
+		r.Post("/api/ringfences/{id}/mode", a.setRingfenceMode)
+		r.Post("/api/ringfences/{id}/programs", a.addRingfenceProgram)
+		r.Delete("/api/ringfences/{id}/programs/{programId}", a.deleteRingfenceProgram)
+		r.Put("/api/ringfences/{id}/protections", a.setRingfenceProtection)
+		r.Post("/api/ringfences/{id}/assign", a.assignRingfence)
+		r.Delete("/api/groups/{id}/ringfence", a.unassignRingfence)
 	})
 
 	r.Group(func(r chi.Router) {
