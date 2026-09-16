@@ -2,7 +2,10 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -66,4 +69,145 @@ func (s *Store) SetRingfenceMode(ctx context.Context, tenantID, id uuid.UUID, mo
 func (s *Store) DeleteRingfence(ctx context.Context, tenantID, id uuid.UUID) error {
 	return oneRow(s.pool.Exec(ctx,
 		`DELETE FROM ringfence_policies WHERE tenant_id=$1 AND id=$2`, tenantID, id))
+}
+
+type RingfenceProgram struct {
+	ID             uuid.UUID
+	Path           string
+	NetworkBlocked bool
+	Note           string
+}
+
+type RingfenceProtection struct {
+	ASRRule string
+	Action  string // audit|block
+}
+
+// ResolvedRingfence is everything an agent needs, with a content hash so the
+// agent can skip a reconcile when nothing changed.
+type ResolvedRingfence struct {
+	Version     string
+	Mode        string
+	Programs    []RingfenceProgram
+	Protections []RingfenceProtection
+}
+
+func (s *Store) AddRingfenceProgram(ctx context.Context, tenantID, ringfenceID uuid.UUID, p RingfenceProgram) error {
+	tag, err := s.pool.Exec(ctx, `
+		INSERT INTO ringfence_programs (id, tenant_id, ringfence_id, path, network_blocked, note)
+		SELECT $1, $2, $3, $4, $5, $6
+		WHERE EXISTS (SELECT 1 FROM ringfence_policies WHERE tenant_id=$2 AND id=$3)`,
+		p.ID, tenantID, ringfenceID, p.Path, p.NetworkBlocked, p.Note)
+	if err != nil {
+		return conflict(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteRingfenceProgram(ctx context.Context, tenantID, ringfenceID, programID uuid.UUID) error {
+	return oneRow(s.pool.Exec(ctx,
+		`DELETE FROM ringfence_programs WHERE tenant_id=$1 AND ringfence_id=$2 AND id=$3`,
+		tenantID, ringfenceID, programID))
+}
+
+func (s *Store) ListRingfencePrograms(ctx context.Context, tenantID, ringfenceID uuid.UUID) ([]RingfenceProgram, error) {
+	rows, _ := s.pool.Query(ctx, `
+		SELECT id, path, network_blocked, note FROM ringfence_programs
+		WHERE tenant_id=$1 AND ringfence_id=$2 ORDER BY path`, tenantID, ringfenceID)
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (RingfenceProgram, error) {
+		var p RingfenceProgram
+		return p, r.Scan(&p.ID, &p.Path, &p.NetworkBlocked, &p.Note)
+	})
+}
+
+// SetRingfenceProtection upserts an ASR rule's action. action "off" deletes
+// the row, so an absent row is the single representation of "not enabled".
+func (s *Store) SetRingfenceProtection(ctx context.Context, tenantID, ringfenceID uuid.UUID, asrRule, action string) error {
+	if action == "off" {
+		_, err := s.pool.Exec(ctx,
+			`DELETE FROM ringfence_protections WHERE tenant_id=$1 AND ringfence_id=$2 AND asr_rule=$3`,
+			tenantID, ringfenceID, asrRule)
+		return err
+	}
+	tag, err := s.pool.Exec(ctx, `
+		INSERT INTO ringfence_protections (tenant_id, ringfence_id, asr_rule, action)
+		SELECT $1, $2, $3, $4
+		WHERE EXISTS (SELECT 1 FROM ringfence_policies WHERE tenant_id=$1 AND id=$2)
+		ON CONFLICT (ringfence_id, asr_rule) DO UPDATE SET action=EXCLUDED.action`,
+		tenantID, ringfenceID, asrRule, action)
+	if err != nil {
+		return conflict(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) ListRingfenceProtections(ctx context.Context, tenantID, ringfenceID uuid.UUID) ([]RingfenceProtection, error) {
+	rows, _ := s.pool.Query(ctx, `
+		SELECT asr_rule, action FROM ringfence_protections
+		WHERE tenant_id=$1 AND ringfence_id=$2 ORDER BY asr_rule`, tenantID, ringfenceID)
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (RingfenceProtection, error) {
+		var p RingfenceProtection
+		return p, r.Scan(&p.ASRRule, &p.Action)
+	})
+}
+
+func (s *Store) AssignRingfence(ctx context.Context, tenantID, groupID, ringfenceID uuid.UUID) error {
+	_, err := s.pool.Exec(ctx, `
+		INSERT INTO ringfence_assignments (tenant_id, group_id, ringfence_id) VALUES ($1,$2,$3)
+		ON CONFLICT (group_id) DO UPDATE SET ringfence_id=EXCLUDED.ringfence_id`,
+		tenantID, groupID, ringfenceID)
+	return conflict(err)
+}
+
+func (s *Store) UnassignRingfence(ctx context.Context, tenantID, groupID uuid.UUID) error {
+	return oneRow(s.pool.Exec(ctx,
+		`DELETE FROM ringfence_assignments WHERE tenant_id=$1 AND group_id=$2`, tenantID, groupID))
+}
+
+// RingfenceForDevice resolves the ringfence assigned to the device's group.
+// ErrNotFound when the device has no group or its group has no ringfence —
+// the agent API turns that into "nothing to enforce".
+func (s *Store) RingfenceForDevice(ctx context.Context, tenantID, deviceID uuid.UUID) (ResolvedRingfence, error) {
+	var rfID uuid.UUID
+	var out ResolvedRingfence
+	err := s.pool.QueryRow(ctx, `
+		SELECT rp.id, rp.mode FROM devices d
+		JOIN ringfence_assignments ra ON ra.group_id = d.group_id AND ra.tenant_id = d.tenant_id
+		JOIN ringfence_policies rp ON rp.id = ra.ringfence_id
+		WHERE d.tenant_id=$1 AND d.id=$2`, tenantID, deviceID).Scan(&rfID, &out.Mode)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ResolvedRingfence{}, ErrNotFound
+	}
+	if err != nil {
+		return ResolvedRingfence{}, err
+	}
+	if out.Programs, err = s.ListRingfencePrograms(ctx, tenantID, rfID); err != nil {
+		return ResolvedRingfence{}, err
+	}
+	if out.Protections, err = s.ListRingfenceProtections(ctx, tenantID, rfID); err != nil {
+		return ResolvedRingfence{}, err
+	}
+	out.Version = ringfenceVersion(out)
+	return out, nil
+}
+
+// ringfenceVersion hashes the resolved content so an unchanged ringfence
+// yields an unchanged version and the agent can skip the reconcile. Both
+// lists are already ordered by the queries above, so the hash is stable.
+func ringfenceVersion(r ResolvedRingfence) string {
+	h := sha256.New()
+	fmt.Fprintf(h, "mode=%s\n", r.Mode)
+	for _, p := range r.Programs {
+		fmt.Fprintf(h, "prog=%s|%t\n", p.Path, p.NetworkBlocked)
+	}
+	for _, p := range r.Protections {
+		fmt.Fprintf(h, "prot=%s|%s\n", p.ASRRule, p.Action)
+	}
+	return hex.EncodeToString(h.Sum(nil))[:32]
 }

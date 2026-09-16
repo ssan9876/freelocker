@@ -62,3 +62,73 @@ func TestRingfenceCRUD(t *testing.T) {
 		t.Errorf("after delete err = %v", err)
 	}
 }
+
+func TestRingfenceForDevice(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	group, _ := s.CreateDeviceGroup(ctx, tenant, "WS")
+	dev := enrollTestDevice(t, s, tenant, &group, "pc1", "1.0.0")
+
+	// No ringfence assigned → ErrNotFound, which the agent API treats as
+	// "nothing to enforce".
+	if _, err := s.RingfenceForDevice(ctx, tenant, dev); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("unassigned err = %v, want ErrNotFound", err)
+	}
+
+	rf := store.Ringfence{ID: uuid.New(), Name: "Office", Mode: "enforce"}
+	if err := s.CreateRingfence(ctx, tenant, rf); err != nil {
+		t.Fatal(err)
+	}
+	prog := store.RingfenceProgram{ID: uuid.New(), Path: `C:\Program Files\App\app.exe`, NetworkBlocked: true, Note: "no internet"}
+	if err := s.AddRingfenceProgram(ctx, tenant, rf.ID, prog); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetRingfenceProtection(ctx, tenant, rf.ID, "D4F940AB-401B-4EFC-AADC-AD5F3C50688A", "block"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AssignRingfence(ctx, tenant, group, rf.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.RingfenceForDevice(ctx, tenant, dev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Mode != "enforce" || len(got.Programs) != 1 || got.Programs[0].Path != prog.Path || len(got.Protections) != 1 {
+		t.Fatalf("resolved = %+v", got)
+	}
+	if got.Version == "" {
+		t.Error("resolved ringfence must carry a content version")
+	}
+
+	// The version is a content hash: unchanged content, unchanged version.
+	again, _ := s.RingfenceForDevice(ctx, tenant, dev)
+	if again.Version != got.Version {
+		t.Errorf("version changed without a content change: %q then %q", got.Version, again.Version)
+	}
+	// Changing content changes the version.
+	if err := s.SetRingfenceProtection(ctx, tenant, rf.ID, "D4F940AB-401B-4EFC-AADC-AD5F3C50688A", "audit"); err != nil {
+		t.Fatal(err)
+	}
+	changed, _ := s.RingfenceForDevice(ctx, tenant, dev)
+	if changed.Version == got.Version {
+		t.Error("version must change when a protection action changes")
+	}
+	// "off" removes the protection entirely.
+	if err := s.SetRingfenceProtection(ctx, tenant, rf.ID, "D4F940AB-401B-4EFC-AADC-AD5F3C50688A", "off"); err != nil {
+		t.Fatal(err)
+	}
+	off, _ := s.RingfenceForDevice(ctx, tenant, dev)
+	if len(off.Protections) != 0 {
+		t.Errorf("protections after off = %+v, want none", off.Protections)
+	}
+
+	// Unassigning returns the device to "nothing to enforce".
+	if err := s.UnassignRingfence(ctx, tenant, group); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RingfenceForDevice(ctx, tenant, dev); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("after unassign err = %v, want ErrNotFound", err)
+	}
+}
