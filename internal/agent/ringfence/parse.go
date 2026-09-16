@@ -57,9 +57,13 @@ func normalisePath(p string) string {
 }
 
 // ParseWFP extracts network violations for ringfenced programs only. Keys of
-// `ringfenced` must be lower-case full paths; matching is on the path tail so
-// a \device\harddiskvolume3\... event matches a C:\... ringfence entry.
-func ParseWFP(raw []byte, ringfenced map[string]bool, enforced bool) ([]Violation, error) {
+// `ringfenced` must be lower-case full paths; matching normalises both the
+// event's \device\harddiskvolumeN\... path and the ringfence entry's C:\...
+// path and requires an exact match — a path suffix match would misattribute
+// an unrelated program's connections to a ringfenced entry. Enforced is
+// derived per-event from the EventID: 5157 is a block, 5156 is an
+// audit-mode observation.
+func ParseWFP(raw []byte, ringfenced map[string]bool) ([]Violation, error) {
 	evts, err := parseEvents(raw)
 	if err != nil {
 		return nil, err
@@ -76,7 +80,7 @@ func ParseWFP(raw []byte, ringfenced map[string]bool, enforced bool) ([]Violatio
 			if i := strings.Index(tail, ":"); i == 1 { // strip "c:"
 				tail = tail[2:]
 			}
-			if app == tail || strings.HasSuffix(app, tail) {
+			if app == tail {
 				matched = want
 				break
 			}
@@ -88,7 +92,7 @@ func ParseWFP(raw []byte, ringfenced map[string]bool, enforced bool) ([]Violatio
 			Kind:     "network",
 			Program:  matched,
 			Detail:   e.field("DestAddress") + ":" + e.field("DestPort"),
-			Enforced: enforced,
+			Enforced: e.EventID == 5157,
 			At:       time.Now(),
 		})
 	}
