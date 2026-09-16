@@ -80,6 +80,7 @@ export function Ringfences() {
                 <th>Name</th>
                 <th>Mode</th>
                 <th>Programs</th>
+                <th>Applied to</th>
                 <th></th>
               </tr>
             </thead>
@@ -95,6 +96,13 @@ export function Ringfences() {
                     <span className={`badge ${rf.mode === "enforce" ? "fail" : "role"}`}>{rf.mode}</span>
                   </td>
                   <td className="mono">{programCounts[rf.id] ?? "—"}</td>
+                  <td>
+                    {rf.groups.length === 0 ? (
+                      <span className="who">Not assigned</span>
+                    ) : (
+                      rf.groups.join(", ")
+                    )}
+                  </td>
                   <td>
                     <button className="ghost" onClick={() => nav(`/ringfences/${rf.id}`)}>
                       Edit

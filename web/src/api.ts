@@ -221,7 +221,15 @@ export type ApprovalRequest = {
   decided_at: string | null;
 };
 
-export type Ringfence = { id: string; name: string; mode: "audit" | "enforce"; created_at: string };
+export type Ringfence = {
+  id: string;
+  name: string;
+  mode: "audit" | "enforce";
+  created_at: string;
+  // Groups this ringfence is applied to. The API always sends an array, so
+  // no null guard is needed; it is empty when the ringfence is unassigned.
+  groups: string[];
+};
 export type RingfenceProgram = { id: string; path: string; network_blocked: boolean; note: string };
 export type RingfenceProtection = { asr_rule: string; action: "audit" | "block" };
 export type RingfenceDetail = {

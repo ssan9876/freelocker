@@ -29,6 +29,9 @@ type ringfenceJSON struct {
 	Name      string    `json:"name"`
 	Mode      string    `json:"mode"`
 	CreatedAt time.Time `json:"created_at"`
+	// Groups this ringfence is applied to. Always present (never null) so
+	// the console can map over it without a guard.
+	Groups []string `json:"groups"`
 }
 
 func (a *API) listRingfences(w http.ResponseWriter, r *http.Request) {
@@ -37,9 +40,20 @@ func (a *API) listRingfences(w http.ResponseWriter, r *http.Request) {
 		a.storeErr(w, err)
 		return
 	}
+	assigned, err := a.Store.RingfenceAssignedGroups(r.Context(), principalFrom(r).TenantID)
+	if err != nil {
+		a.storeErr(w, err)
+		return
+	}
 	out := make([]ringfenceJSON, 0, len(rfs))
 	for _, rf := range rfs {
-		out = append(out, ringfenceJSON{ID: rf.ID.String(), Name: rf.Name, Mode: rf.Mode, CreatedAt: rf.CreatedAt})
+		groups := assigned[rf.ID]
+		if groups == nil {
+			groups = []string{}
+		}
+		out = append(out, ringfenceJSON{
+			ID: rf.ID.String(), Name: rf.Name, Mode: rf.Mode, CreatedAt: rf.CreatedAt, Groups: groups,
+		})
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -68,7 +82,7 @@ func (a *API) getRingfence(w http.ResponseWriter, r *http.Request) {
 		protOut = append(protOut, map[string]any{"asr_rule": pt.ASRRule, "action": pt.Action})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ringfence":   ringfenceJSON{ID: rf.ID.String(), Name: rf.Name, Mode: rf.Mode, CreatedAt: rf.CreatedAt},
+		"ringfence":   ringfenceJSON{ID: rf.ID.String(), Name: rf.Name, Mode: rf.Mode, CreatedAt: rf.CreatedAt, Groups: []string{}},
 		"programs":    progOut,
 		"protections": protOut,
 	})
@@ -395,7 +409,7 @@ func (a *API) getDeviceRingfence(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ringfence":   ringfenceJSON{ID: rf.ID.String(), Name: rf.Name, Mode: rf.Mode, CreatedAt: rf.CreatedAt},
+		"ringfence":   ringfenceJSON{ID: rf.ID.String(), Name: rf.Name, Mode: rf.Mode, CreatedAt: rf.CreatedAt, Groups: []string{}},
 		"programs":    progOut,
 		"protections": protOut,
 	})

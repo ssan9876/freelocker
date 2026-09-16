@@ -199,6 +199,33 @@ func (s *Store) GroupRingfenceID(ctx context.Context, tenantID, groupID uuid.UUI
 // RingfenceForDevice resolves the ringfence assigned to the device's group.
 // ErrNotFound when the device has no group or its group has no ringfence —
 // the agent API turns that into "nothing to enforce".
+// RingfenceAssignedGroups returns the group names each ringfence is applied
+// to, keyed by ringfence id, for the whole tenant in one query. A ringfence
+// with no assignments is simply absent from the map.
+//
+// Grouped rather than per-ringfence so the list page costs one round trip
+// regardless of how many ringfences a tenant has.
+func (s *Store) RingfenceAssignedGroups(ctx context.Context, tenantID uuid.UUID) (map[uuid.UUID][]string, error) {
+	rows, _ := s.pool.Query(ctx, `
+		SELECT ra.ringfence_id, g.name
+		FROM ringfence_assignments ra
+		JOIN device_groups g ON g.id = ra.group_id AND g.tenant_id = ra.tenant_id
+		WHERE ra.tenant_id = $1
+		ORDER BY g.name`, tenantID)
+	defer rows.Close()
+
+	out := make(map[uuid.UUID][]string)
+	for rows.Next() {
+		var id uuid.UUID
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		out[id] = append(out[id], name)
+	}
+	return out, rows.Err()
+}
+
 // DeviceRingfence returns the ringfence assigned to a device's group, with
 // its identity intact. ErrNotFound when the device has no group, no
 // assignment, or is not in this tenant.

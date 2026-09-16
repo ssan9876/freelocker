@@ -295,3 +295,60 @@ func TestDeviceRingfenceIsTenantScoped(t *testing.T) {
 		t.Errorf("B reading A's device = %v, want ErrNotFound", err)
 	}
 }
+
+// The ringfences list needs to show where each one is applied. Fetched in a
+// single grouped query rather than per ringfence, so the list page does not
+// issue one round trip per row.
+func TestRingfenceAssignedGroups(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenant, _ := s.CreateTenant(ctx, "Acme")
+	ws, _ := s.CreateDeviceGroup(ctx, tenant, "Workstations")
+	kiosks, _ := s.CreateDeviceGroup(ctx, tenant, "Kiosks")
+
+	office := store.Ringfence{ID: uuid.New(), Name: "Office", Mode: "audit"}
+	unused := store.Ringfence{ID: uuid.New(), Name: "Unused", Mode: "audit"}
+	s.CreateRingfence(ctx, tenant, office)
+	s.CreateRingfence(ctx, tenant, unused)
+
+	// One ringfence on two groups; the other on none.
+	if err := s.AssignRingfence(ctx, tenant, ws, office.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AssignRingfence(ctx, tenant, kiosks, office.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.RingfenceAssignedGroups(ctx, tenant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Ordered by name so the console renders deterministically.
+	want := []string{"Kiosks", "Workstations"}
+	if len(got[office.ID]) != 2 || got[office.ID][0] != want[0] || got[office.ID][1] != want[1] {
+		t.Errorf("office groups = %v, want %v", got[office.ID], want)
+	}
+	if len(got[unused.ID]) != 0 {
+		t.Errorf("unused groups = %v, want none", got[unused.ID])
+	}
+}
+
+// Another tenant's assignments must never appear in this tenant's list.
+func TestRingfenceAssignedGroupsIsTenantScoped(t *testing.T) {
+	ctx := context.Background()
+	s := storetest.New(t)
+	tenantA, _ := s.CreateTenant(ctx, "Acme")
+	groupA, _ := s.CreateDeviceGroup(ctx, tenantA, "A-WS")
+	rfA := store.Ringfence{ID: uuid.New(), Name: "A-Office", Mode: "audit"}
+	s.CreateRingfence(ctx, tenantA, rfA)
+	s.AssignRingfence(ctx, tenantA, groupA, rfA.ID)
+
+	tenantB, _ := s.CreateTenant(ctx, "Beta")
+	got, err := s.RingfenceAssignedGroups(ctx, tenantB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Errorf("tenant B sees %v, want nothing", got)
+	}
+}
