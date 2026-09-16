@@ -11,6 +11,7 @@ import {
   MetricSample,
   Observation,
   Policy,
+  RingfenceEvent,
 } from "../api";
 import { useAuth } from "../auth";
 import { StatusDot } from "../components/StatusDot";
@@ -51,6 +52,7 @@ export function DeviceDetail() {
   const { me } = useAuth();
   const canEdit = me?.role !== "readonly";
   const [ctl, setCtl] = useState<DeviceControlsView | null>(null);
+  const [ringfenceEvents, setRingfenceEvents] = useState<RingfenceEvent[]>([]);
   const [promoteTo, setPromoteTo] = useState("");
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -61,6 +63,10 @@ export function DeviceDetail() {
     api.get<Observation[]>(`/api/devices/${id}/observations?limit=100`).then(setObs).catch(() => {});
     api.get<MetricSample[]>(`/api/devices/${id}/metrics?limit=120`).then(setSamples).catch(() => {});
     api.get<DeviceControlsView>(`/api/devices/${id}/controls`).then(setCtl).catch(() => {});
+    api
+      .get<RingfenceEvent[]>(`/api/ringfence-events?limit=500`)
+      .then((evs) => setRingfenceEvents(evs.filter((e) => e.device_id === id)))
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -275,6 +281,48 @@ export function DeviceDetail() {
           </div>
         </div>
       )}
+
+      <div className="panel" style={{ marginTop: 20 }}>
+        <h2>Ringfence enforcement</h2>
+        <p className="who" style={{ marginTop: -8 }}>
+          The console does not yet expose this device's effective ringfence assignment or whether
+          Defender/ASR is available on it — that requires a read endpoint Task 10 did not add. This is the
+          device's recent ringfence activity reported by the agent; "Enforced" means the action was
+          actually blocked, not just logged.
+        </p>
+        {ringfenceEvents.length === 0 ? (
+          <div className="empty">No ringfence activity reported for this device yet.</div>
+        ) : (
+          <div className="table-wrap" style={{ border: "none" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Kind</th>
+                  <th>Program</th>
+                  <th>Detail</th>
+                  <th>Enforced</th>
+                  <th>At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ringfenceEvents.slice(0, 50).map((e) => (
+                  <tr key={e.id}>
+                    <td>{e.kind.replace("_", " ")}</td>
+                    <td className="mono">{e.program}</td>
+                    <td className="mono">{e.detail}</td>
+                    <td>
+                      <span className={`badge ${e.enforced ? "fail" : "role"}`}>
+                        {e.enforced ? "Blocked" : "Audit only"}
+                      </span>
+                    </td>
+                    <td>{timeAgo(e.at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="panel" style={{ marginTop: 20 }}>
         <h2>Recent commands</h2>

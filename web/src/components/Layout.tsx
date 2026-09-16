@@ -7,6 +7,7 @@ import { useTheme } from "./util";
 const NAV = [
   { to: "/devices", label: "Devices" },
   { to: "/policies", label: "Policies" },
+  { to: "/ringfences", label: "Ringfences" },
   { to: "/blocks", label: "Blocked programs" },
   { to: "/approvals", label: "Approvals" },
   { to: "/alerts", label: "Alerts" },

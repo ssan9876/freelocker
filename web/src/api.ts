@@ -39,6 +39,7 @@ export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),
+  put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
   del: <T>(path: string) => request<T>("DELETE", path),
   async upload<T>(path: string, form: FormData): Promise<T> {
     const headers: Record<string, string> = {};
@@ -214,6 +215,25 @@ export type ApprovalRequest = {
   first_seen: string;
   last_seen: string;
   decided_at: string | null;
+};
+
+export type Ringfence = { id: string; name: string; mode: "audit" | "enforce"; created_at: string };
+export type RingfenceProgram = { id: string; path: string; network_blocked: boolean; note: string };
+export type RingfenceProtection = { asr_rule: string; action: "audit" | "block" };
+export type RingfenceDetail = {
+  ringfence: Ringfence;
+  programs: RingfenceProgram[];
+  protections: RingfenceProtection[];
+};
+export type RingfenceEvent = {
+  id: number;
+  device_id: string;
+  hostname: string;
+  kind: "network" | "child_process";
+  program: string;
+  detail: string;
+  enforced: boolean;
+  at: string;
 };
 
 export type NotificationStatus = { smtp_configured: boolean; event_kinds: string[] };

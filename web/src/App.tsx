@@ -11,6 +11,8 @@ import { Devices } from "./pages/Devices";
 import { DeviceDetail } from "./pages/DeviceDetail";
 import { Policies } from "./pages/Policies";
 import { PolicyDetail } from "./pages/PolicyDetail";
+import { Ringfences } from "./pages/Ringfences";
+import { RingfenceDetail } from "./pages/RingfenceDetail";
 import { Blocks } from "./pages/Blocks";
 import { Approvals } from "./pages/Approvals";
 import { Alerts } from "./pages/Alerts";
@@ -77,6 +79,8 @@ export function App() {
         <Route path="/devices/:id" element={<DeviceDetail />} />
         <Route path="/policies" element={<Policies />} />
         <Route path="/policies/:id" element={<PolicyDetail />} />
+        <Route path="/ringfences" element={<Ringfences />} />
+        <Route path="/ringfences/:id" element={<RingfenceDetail />} />
         <Route path="/blocks" element={<Blocks />} />
         <Route path="/approvals" element={<Approvals />} />
         <Route path="/alerts" element={<Alerts />} />
