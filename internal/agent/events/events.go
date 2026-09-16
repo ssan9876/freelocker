@@ -12,8 +12,13 @@ import (
 	"time"
 )
 
+// tokenElevationFull is TokenElevationTypeFull in 4688's TokenElevationType
+// field. Windows writes the raw message-table reference, not a friendly
+// name, so this is matched literally.
+const tokenElevationFull = "%%1937"
+
 type Event struct {
-	Kind    string // "process_launch" | "logon"
+	Kind    string // "process_launch" | "logon" | "elevation"
 	Summary string // human-readable one-liner
 	At      time.Time
 }
@@ -56,9 +61,25 @@ func ParseSecurity(raw []byte) ([]Event, error) {
 		at, _ := time.Parse(time.RFC3339Nano, e.System.TimeCreated.SystemTime)
 		switch e.System.EventID {
 		case 4688: // process creation
+			user := firstNonEmpty(data["SubjectUserName"], "?")
+			image := firstNonEmpty(data["NewProcessName"], "?")
+			// TokenElevationType %%1937 is TokenElevationTypeFull: the
+			// process received a full administrator token. That is what an
+			// admin means by "this app asked for system-level credentials",
+			// and it is worth separating from the thousands of ordinary
+			// launches it would otherwise be buried among. %%1936 (default)
+			// and %%1938 (limited) are ordinary.
+			if data["TokenElevationType"] == tokenElevationFull {
+				out = append(out, Event{
+					Kind:    "elevation",
+					Summary: fmt.Sprintf("%s launched %s elevated (full administrator token)", user, image),
+					At:      at,
+				})
+				break
+			}
 			out = append(out, Event{
 				Kind:    "process_launch",
-				Summary: fmt.Sprintf("%s launched %s", firstNonEmpty(data["SubjectUserName"], "?"), firstNonEmpty(data["NewProcessName"], "?")),
+				Summary: fmt.Sprintf("%s launched %s", user, image),
 				At:      at,
 			})
 		case 4624: // successful logon

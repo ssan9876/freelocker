@@ -8,6 +8,7 @@ const KINDS = [
   { value: "", label: "All activity" },
   { value: "process_launch", label: "Process launches" },
   { value: "logon", label: "Logons" },
+  { value: "elevation", label: "Elevations" },
 ];
 
 export function Events() {
@@ -37,7 +38,7 @@ export function Events() {
         </select>
       </div>
       <p className="who" style={{ marginTop: -8, marginBottom: 14 }}>
-        Process launches and logons reported by agents, so you can spot anything unusual.
+        Process launches, logons and elevations reported by agents, so you can spot anything unusual. An elevation is a process that received a full administrator token.
       </p>
       {!events ? (
         <div className="spin">Loading…</div>
@@ -57,7 +58,21 @@ export function Events() {
               {events.map((e) => (
                 <tr key={e.id}>
                   <td>{fmtDate(e.at)}</td>
-                  <td>{e.kind === "process_launch" ? "Process" : e.kind === "logon" ? "Logon" : e.kind}</td>
+                  <td>
+                    {e.kind === "elevation" ? (
+                      // Badged because this is the one kind worth picking out
+                      // of a feed that is otherwise mostly routine launches.
+                      <span className="badge fail" title="Ran with a full administrator token">
+                        Elevation
+                      </span>
+                    ) : e.kind === "process_launch" ? (
+                      "Process"
+                    ) : e.kind === "logon" ? (
+                      "Logon"
+                    ) : (
+                      e.kind
+                    )}
+                  </td>
                   <td className="mono">{e.summary}</td>
                 </tr>
               ))}
