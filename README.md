@@ -47,8 +47,12 @@ can never become rules); **per-device control overrides** (each control is
 Inherit / Allow / Block per device, layered over its group); **interactive approvals**
 (a would-block becomes an approval request an admin approves as a hash, path
 or publisher rule); **richer device controls** (network and elevation, not just
-USB); **telemetry event streams** (process launches and logons on an
-Activity page); **health/readiness probes** and **Let's Encrypt** console
+USB); **telemetry event streams** (process launches, logons and
+elevations on an Activity page — an elevation being a process that received
+a full administrator token); **download provenance** (the agent reads
+Mark-of-the-Web, so the console distinguishes software fetched from the
+internet from software that was installed; a hint for review, never a
+security boundary, since a user can strip the mark from their own file); **health/readiness probes** and **Let's Encrypt** console
 TLS; **multi-instance safety** (the login rate-limiter and alert breach
 state live in Postgres) and **time-series retention**; **email, webhook and syslog
 notifications** (a retrying outbox fans alert, approval and rollout events
